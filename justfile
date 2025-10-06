@@ -45,7 +45,7 @@ run: setup
 
 # Setup environment
 setup:
-    git pull
+    git pull --rebase
     @test -d venv || python3 -m venv venv
     @venv/bin/pip install -q -r requirements.txt
 
