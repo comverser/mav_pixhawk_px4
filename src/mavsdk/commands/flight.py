@@ -1,7 +1,6 @@
 """Flight operations"""
 import asyncio
-from mavsdk import System
-from src.core.connection import connect, wait_for_gps
+from src.mavsdk.connection import connect, wait_for_gps
 
 
 async def takeoff() -> None:

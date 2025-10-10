@@ -1,20 +1,26 @@
-"""Drone connection utilities"""
-import os
-import sys
+"""MAVSDK connection utilities"""
 from mavsdk import System
-
-DRONE_ADDRESS = os.getenv("DRONE_ADDRESS")
+from src.mavsdk.config import get_connection_address
 
 
 async def connect(address: str = None) -> System:
-    """Connect to drone and wait for connection."""
-    connection_address = address or DRONE_ADDRESS
-    if not connection_address:
-        print("Error: DRONE_ADDRESS environment variable not set")
-        sys.exit(1)
+    """
+    Connect to drone via MAVSDK and wait for connection.
+
+    Args:
+        address: Connection address. If None, uses DRONE_ADDRESS environment variable.
+
+    Returns:
+        System: Connected MAVSDK System instance.
+
+    Raises:
+        ValueError: If address is not provided and DRONE_ADDRESS is not set.
+    """
+    if address is None:
+        address = get_connection_address()
 
     drone = System()
-    await drone.connect(system_address=connection_address)
+    await drone.connect(system_address=address)
 
     print("Waiting for drone to connect...")
     async for state in drone.core.connection_state():

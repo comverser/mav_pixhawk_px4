@@ -1,6 +1,6 @@
 """EKF and sensor telemetry queries"""
 import asyncio
-from src.core.connection import connect
+from src.mavsdk.connection import connect
 
 
 async def monitor_ekf(duration: float = 10.0) -> None:

@@ -1,8 +1,9 @@
 """CLI entry point"""
 import asyncio
 import sys
-from src.commands import flight, shell, offboard
-from src.telemetry import ekf
+from src.mavsdk.commands import flight, shell, offboard
+from src.mavsdk.telemetry import ekf
+from src.mavlink.telemetry import rc_channels
 
 
 def main(argv: list[str] = None) -> None:
@@ -39,6 +40,11 @@ def main(argv: list[str] = None) -> None:
     elif args[0] == "ekf-monitor":
         duration = float(args[1]) if len(args) > 1 else 10.0
         asyncio.run(ekf.monitor_ekf(duration))
+    elif args[0] == "rc-status":
+        asyncio.run(rc_channels.rc_channels_once())
+    elif args[0] == "rc-monitor":
+        duration = float(args[1]) if len(args) > 1 else 10.0
+        asyncio.run(rc_channels.monitor_rc_channels(duration))
 
     else:
         print(f"Unknown command: {args[0]}")

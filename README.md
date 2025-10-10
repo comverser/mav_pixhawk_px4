@@ -1,6 +1,6 @@
-# mavsdk_px4_py_hello
+# mav_px4_py_hello
 
-MAVSDK-Python drone control interface
+Dual MAVLink/MAVSDK drone control interface
 
 ## Requirements
 

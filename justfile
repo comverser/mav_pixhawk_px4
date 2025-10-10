@@ -26,6 +26,8 @@ run: setup
     echo "Telemetry:"
     echo "4. EKF status"
     echo "5. EKF monitor"
+    echo "6. RC status"
+    echo "7. RC monitor"
     read -p "Choice [1]: " cmd_choice
     cmd_choice=${cmd_choice:-1}
     case $cmd_choice in
@@ -39,6 +41,11 @@ run: setup
         5)
             read -p "Duration [10]: " duration
             DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main ekf-monitor "${duration:-10}"
+            ;;
+        6) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-status ;;
+        7)
+            read -p "Duration [10]: " duration
+            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "${duration:-10}"
             ;;
         *) echo "Invalid"; exit 1 ;;
     esac

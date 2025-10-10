@@ -1,7 +1,7 @@
 """Offboard control for custom vehicles using trajectory_setpoint reinterpretation"""
 import asyncio
 from mavsdk.offboard import VelocityBodyYawspeed, OffboardError
-from src.core.connection import connect
+from src.mavsdk.connection import connect
 
 
 async def offboard_control(forward: float, lateral: float, vertical: float,

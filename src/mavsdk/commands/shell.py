@@ -1,7 +1,7 @@
 """PX4 shell command utilities"""
 import asyncio
 from mavsdk import System
-from src.core.connection import connect
+from src.mavsdk.connection import connect
 
 
 async def execute(command: str) -> None:
