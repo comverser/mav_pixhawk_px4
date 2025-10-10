@@ -31,8 +31,6 @@ def main(argv: list[str] = None) -> None:
         asyncio.run(offboard.offboard_control(forward, lateral, vertical, yaw_rate, duration))
     elif args[0] == "offboard-hover":
         asyncio.run(offboard.test_hover())
-    elif args[0] == "offboard-forward":
-        asyncio.run(offboard.test_forward())
 
     # Telemetry
     elif args[0] == "ekf-status":

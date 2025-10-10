@@ -56,6 +56,9 @@ setup:
     @test -d venv || python3 -m venv venv
     @venv/bin/pip install -q -r requirements.txt
 
-# Clean
+# Clean build artifacts and caches
 clean:
     rm -rf venv
+    find . -type d -name "__pycache__" -exec rm -rf {} +
+    find . -type f -name "*.pyc" -delete
+    find . -type f -name "*.pyo" -delete

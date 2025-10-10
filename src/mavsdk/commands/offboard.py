@@ -47,8 +47,3 @@ async def offboard_control(forward: float, lateral: float, vertical: float,
 async def test_hover() -> None:
     """Hover test."""
     await offboard_control(0.0, 0.0, 0.0, 0.0, 10.0)
-
-
-async def test_forward() -> None:
-    """Forward movement test."""
-    await offboard_control(2.0, 0.0, 0.0, 0.0, 10.0)
