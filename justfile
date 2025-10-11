@@ -13,7 +13,7 @@ setup:
     git pull --rebase --autostash
 
 # Clean all build artifacts
-clean: python-clean
+clean: python-clean rust-clean
 
 # ============================================================================
 # Python
@@ -44,13 +44,47 @@ _select-language:
     #!/usr/bin/env bash
     echo "Select Language:"
     echo "  1. Python [default]"
+    echo "  2. Rust"
     echo ""
     read -p "Choice [1]: " lang_choice
     lang_choice=${lang_choice:-1}
 
     case $lang_choice in
         1) just python-run ;;
+        2) just rust-run ;;
         *) echo "Invalid choice"; exit 1 ;;
+    esac
+
+# Get connection type interactively (returns format for given language)
+_get-connection format="python":
+    #!/usr/bin/env bash
+    # Print prompts to stderr so they don't get captured
+    echo "Select Connection:" >&2
+    echo "  1. UDP SITL [default]" >&2
+    echo "  2. Serial" >&2
+    echo "" >&2
+    read -p "Choice [1]: " conn_choice
+    conn_choice=${conn_choice:-1}
+
+    case $conn_choice in
+        1)
+            if [ "{{format}}" = "python" ]; then
+                echo "udpin://0.0.0.0:14540"
+            else
+                echo "udpin:0.0.0.0:14540"
+            fi
+            ;;
+        2)
+            if [ "{{format}}" = "python" ]; then
+                echo "serial:/dev/ttyACM0:57600"
+            else
+                echo "serial:/dev/ttyACM0:57600"
+            fi
+            ;;
+        *)
+            echo "Invalid choice" >&2
+            exit 1
+            ;;
     esac
 
 # Python interactive command selection
@@ -60,23 +94,7 @@ _python-interactive:
     . venv/bin/activate
 
     # Get connection
-    echo "Select Connection:"
-    echo "  1. UDP SITL [default]"
-    echo "  2. Serial"
-    echo "  3. Custom"
-    echo ""
-    read -p "Choice [1]: " conn_choice
-    conn_choice=${conn_choice:-1}
-
-    case $conn_choice in
-        1) DRONE_ADDRESS="udpin://0.0.0.0:14540" ;;
-        2) DRONE_ADDRESS="serial:/dev/ttyACM0:57600" ;;
-        3)
-            read -p "Connection string: " DRONE_ADDRESS
-            [ -z "$DRONE_ADDRESS" ] && echo "Invalid connection" && exit 1
-            ;;
-        *) echo "Invalid choice"; exit 1 ;;
-    esac
+    DRONE_ADDRESS=$(just _get-connection python)
 
     # Get command
     echo ""
@@ -122,6 +140,65 @@ _python-interactive:
             read -p "Duration [10]: " duration
             duration=${duration:-10}
             DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "$duration"
+            ;;
+        *)
+            echo "Invalid choice"; exit 1
+            ;;
+    esac
+
+# ============================================================================
+# Rust
+# ============================================================================
+
+# Build Rust project
+rust-build:
+    @cd rust && cargo build --release
+
+# Run Rust examples interactively
+rust-run: rust-build
+    @just _rust-interactive
+
+# Clean Rust build artifacts
+rust-clean:
+    @test -d rust/target && cd rust && cargo clean || true
+
+# Rust interactive command selection
+_rust-interactive:
+    #!/usr/bin/env bash
+    cd rust
+
+    # Get connection
+    CONNECTION=$(just _get-connection rust)
+
+    # Get message filter
+    echo ""
+    echo "Select Message Filter:"
+    echo "  1. All messages [default]"
+    echo "  2. GLOBAL_POSITION_INT"
+    echo "  3. ATTITUDE"
+    echo "  4. HEARTBEAT"
+    echo "  5. Custom message"
+    echo ""
+    read -p "Choice [1]: " msg_choice
+    msg_choice=${msg_choice:-1}
+
+    case $msg_choice in
+        1)
+            cargo run --release -- "$CONNECTION"
+            ;;
+        2)
+            cargo run --release -- "$CONNECTION" --messages "GLOBAL_POSITION_INT"
+            ;;
+        3)
+            cargo run --release -- "$CONNECTION" --messages "ATTITUDE"
+            ;;
+        4)
+            cargo run --release -- "$CONNECTION" --messages "HEARTBEAT"
+            ;;
+        5)
+            read -p "Message name: " MESSAGE
+            [ -z "$MESSAGE" ] && echo "No message provided" && exit 1
+            cargo run --release -- "$CONNECTION" --messages "$MESSAGE"
             ;;
         *)
             echo "Invalid choice"; exit 1

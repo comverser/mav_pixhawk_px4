@@ -1,17 +1,15 @@
-# mav_px4_py_hello
+# mav_pixhawk_px4
 
-Dual MAVLink/MAVSDK drone control interface
+This repository provides MAVLink-based drone control implementations in multiple languages:
 
-## Requirements
+- **Python**: MAVSDK-Python (high-level) & PyMAVLink (low-level)
+- **Rust**: Direct MAVLink protocol implementation
 
-- [Ubuntu](https://ubuntu.com/)
-- [Python](https://www.python.org/) 3.7+
+## Prerequisites
+
 - [just](https://github.com/casey/just) - Command runner
+- [PX4 with external modules](https://github.com/comverser/px4_with_extern_modules) must be running (SITL)
 
 ## Usage
 
-See [justfile](justfile) for all available recipes and usage examples.
-
-### Prerequisites
-
-[PX4 with external modules](https://github.com/comverser/px4_with_extern_modules) must be running before executing commands.
+See [justfile](justfile) for all available commands and recipes.
