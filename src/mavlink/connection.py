@@ -1,7 +1,7 @@
 """MAVLink connection utilities"""
 from pymavlink import mavutil
 from pymavlink.mavutil import mavlink_connection
-from src.mavlink.config import get_connection_address, convert_address_format
+from src.config import get_connection_address, convert_mavsdk_to_pymavlink_address
 
 
 def connect(address: str = None) -> mavlink_connection:
@@ -20,15 +20,10 @@ def connect(address: str = None) -> mavlink_connection:
     if address is None:
         address = get_connection_address()
 
-    # Convert MAVSDK format to pymavlink format
-    connection_address = convert_address_format(address)
-
+    connection_address = convert_mavsdk_to_pymavlink_address(address)
     print(f"Connecting to {connection_address}...")
 
-    # Create MAVLink connection
     mav = mavutil.mavlink_connection(connection_address)
-
-    # Wait for heartbeat
     print("Waiting for heartbeat...")
     mav.wait_heartbeat()
     print(f"Heartbeat from system {mav.target_system}, component {mav.target_component}")

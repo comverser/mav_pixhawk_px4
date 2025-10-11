@@ -1,6 +1,6 @@
 """MAVSDK connection utilities"""
 from mavsdk import System
-from src.mavsdk.config import get_connection_address
+from src.config import get_connection_address
 
 
 async def connect(address: str = None) -> System:

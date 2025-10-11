@@ -1,16 +1,16 @@
-"""MAVLink configuration"""
+"""Shared configuration utilities"""
 import os
 
 
 def get_connection_address() -> str:
-    """Get MAVLink connection address from environment variable."""
+    """Get connection address from environment variable."""
     address = os.getenv("DRONE_ADDRESS")
     if not address:
         raise ValueError("DRONE_ADDRESS environment variable not set")
     return address
 
 
-def convert_address_format(address: str) -> str:
+def convert_mavsdk_to_pymavlink_address(address: str) -> str:
     """
     Convert MAVSDK address format to pymavlink format.
 
