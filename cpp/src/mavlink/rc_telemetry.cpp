@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -75,18 +76,13 @@ void RCTelemetry::connect_serial(const std::string& device, int baudrate) {
     cfsetospeed(&tty, speed);
     cfsetispeed(&tty, speed);
 
-    // Configure port settings
-    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;  // 8-bit chars
-    tty.c_iflag &= ~IGNBRK;                       // disable break processing
-    tty.c_lflag = 0;                              // no signaling chars, no echo, no canonical processing
-    tty.c_oflag = 0;                              // no remapping, no delays
-    tty.c_cc[VMIN]  = 0;                          // read doesn't block
-    tty.c_cc[VTIME] = 10;                         // 1 second read timeout
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);       // shut off xon/xoff ctrl
-    tty.c_cflag |= (CLOCAL | CREAD);              // ignore modem controls, enable reading
-    tty.c_cflag &= ~(PARENB | PARODD);            // shut off parity
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CRTSCTS;
+    // Standard MAVLink serial configuration: 8N1, raw mode, no flow control
+    tty.c_cflag = CS8 | CLOCAL | CREAD;
+    tty.c_iflag = 0;
+    tty.c_lflag = 0;
+    tty.c_oflag = 0;
+    tty.c_cc[VMIN] = 1;
+    tty.c_cc[VTIME] = 0;
 
     if (tcsetattr(fd, TCSANOW, &tty) != 0) {
         close(fd);
@@ -109,6 +105,11 @@ void RCTelemetry::monitor_rc_channels() {
     mavlink_message_t msg;
     mavlink_status_t status;
 
+    // Rate measurement
+    auto last_time = std::chrono::steady_clock::now();
+    int message_count = 0;
+    double update_rate = 0.0;
+
     while (true) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n > 0) {
@@ -118,6 +119,17 @@ void RCTelemetry::monitor_rc_channels() {
                         mavlink_rc_channels_t rc;
                         mavlink_msg_rc_channels_decode(&msg, &rc);
 
+                        // Calculate update rate
+                        message_count++;
+                        auto now = std::chrono::steady_clock::now();
+                        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count();
+
+                        if (elapsed >= 1000) {  // Update rate every second
+                            update_rate = (message_count * 1000.0) / elapsed;
+                            last_time = now;
+                            message_count = 0;
+                        }
+
                         std::cout << "CH1: " << rc.chan1_raw << " | "
                                   << "CH2: " << rc.chan2_raw << " | "
                                   << "CH3: " << rc.chan3_raw << " | "
@@ -125,7 +137,8 @@ void RCTelemetry::monitor_rc_channels() {
                                   << "CH5: " << rc.chan5_raw << " | "
                                   << "CH6: " << rc.chan6_raw << " | "
                                   << "CH7: " << rc.chan7_raw << " | "
-                                  << "CH8: " << rc.chan8_raw << std::endl;
+                                  << "CH8: " << rc.chan8_raw << " | "
+                                  << "Rate: " << update_rate << " Hz" << std::endl;
                     }
                 }
             }
