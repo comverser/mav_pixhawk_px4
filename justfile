@@ -11,6 +11,7 @@ run: setup
 # Setup all environments
 setup:
     git pull --rebase --autostash
+    git submodule update --init --remote
 
 # Clean all build artifacts
 clean: python-clean cpp-clean rust-clean
@@ -19,14 +20,14 @@ clean: python-clean cpp-clean rust-clean
 # Python
 # ============================================================================
 
-# Run Python examples interactively
-python-run: python-setup
-    @just _python-interactive
-
 # Setup Python environment
 python-setup:
     @cd python && test -d venv || python3 -m venv venv
     @cd python && venv/bin/pip install -q -r requirements.txt
+
+# Run Python examples interactively
+python-run: python-setup
+    @just _python-interactive
 
 # Clean Python artifacts
 python-clean:
@@ -39,12 +40,8 @@ python-clean:
 # C++
 # ============================================================================
 
-# Setup C++ dependencies
-cpp-setup:
-    @test -d cpp/external/mavlink || (cd cpp && git clone --depth 1 https://github.com/mavlink/c_library_v2.git external/mavlink)
-
 # Build C++ project
-cpp-build: cpp-setup
+cpp-build:
     @mkdir -p cpp/build
     @cd cpp/build && cmake .. && make
 
