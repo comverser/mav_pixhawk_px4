@@ -13,7 +13,7 @@ setup:
     git pull --rebase --autostash
 
 # Clean all build artifacts
-clean: python-clean rust-clean
+clean: python-clean cpp-clean rust-clean
 
 # ============================================================================
 # Python
@@ -36,6 +36,39 @@ python-clean:
     @find python -type f -name "*.pyo" -delete 2>/dev/null || true
 
 # ============================================================================
+# C++
+# ============================================================================
+
+# Build C++ project
+cpp-build:
+    @mkdir -p cpp/build
+    @cd cpp/build && cmake .. && make
+
+# Run C++ examples interactively
+cpp-run: cpp-build
+    @just _cpp-interactive
+
+# Clean C++ build artifacts
+cpp-clean:
+    @rm -rf cpp/build
+
+# ============================================================================
+# Rust
+# ============================================================================
+
+# Build Rust project
+rust-build:
+    @cd rust && cargo build --release
+
+# Run Rust examples interactively
+rust-run: rust-build
+    @just _rust-interactive
+
+# Clean Rust build artifacts
+rust-clean:
+    @test -d rust/target && cd rust && cargo clean || true
+
+# ============================================================================
 # Internal Helpers
 # ============================================================================
 
@@ -44,14 +77,16 @@ _select-language:
     #!/usr/bin/env bash
     echo "Select Language:"
     echo "  1. Python [default]"
-    echo "  2. Rust"
+    echo "  2. C++"
+    echo "  3. Rust"
     echo ""
     read -p "Choice [1]: " lang_choice
     lang_choice=${lang_choice:-1}
 
     case $lang_choice in
         1) just python-run ;;
-        2) just rust-run ;;
+        2) just cpp-run ;;
+        3) just rust-run ;;
         *) echo "Invalid choice"; exit 1 ;;
     esac
 
@@ -146,21 +181,18 @@ _python-interactive:
             ;;
     esac
 
-# ============================================================================
-# Rust
-# ============================================================================
+# C++ interactive command selection
+_cpp-interactive:
+    #!/usr/bin/env bash
+    cd cpp/build
 
-# Build Rust project
-rust-build:
-    @cd rust && cargo build --release
+    # Get connection
+    DRONE_ADDRESS=$(just _get-connection python)
 
-# Run Rust examples interactively
-rust-run: rust-build
-    @just _rust-interactive
+    # Run RC monitor
+    DRONE_ADDRESS="$DRONE_ADDRESS" ./main rc-monitor
 
-# Clean Rust build artifacts
-rust-clean:
-    @test -d rust/target && cd rust && cargo clean || true
+    # TODO: Add MAVSDK implementation option
 
 # Rust interactive command selection
 _rust-interactive:

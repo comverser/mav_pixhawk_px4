@@ -19,7 +19,6 @@ def main(argv: list[str] = None) -> None:
     elif args[0] == "shell" and len(args) > 1:
         asyncio.run(shell.execute(' '.join(args[1:])))
     elif args[0] == "offboard":
-        # Parse offboard control parameters
         if len(args) < 5:
             print("Usage: offboard <forward> <lateral> <vertical> <yaw_rate> [duration]")
             sys.exit(1)
