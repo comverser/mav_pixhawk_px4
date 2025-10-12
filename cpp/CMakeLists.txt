@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # MAVLink headers (header-only library)
-set(MAVLINK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/mavlink")
+set(MAVLINK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/mavlink")
 
 # Main executable
 add_executable(main
