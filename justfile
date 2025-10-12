@@ -111,11 +111,7 @@ _get-connection format="python":
             fi
             ;;
         2)
-            if [ "{{format}}" = "python" ]; then
-                echo "serial:/dev/ttyACM0:57600"
-            else
-                echo "serial:/dev/ttyACM0:57600"
-            fi
+            echo "serial:/dev/ttyACM0:57600"
             ;;
         *)
             echo "Invalid choice" >&2
@@ -187,8 +183,8 @@ _cpp-interactive:
     #!/usr/bin/env bash
     cd cpp/build
 
-    # Get connection
-    DRONE_ADDRESS=$(just _get-connection python)
+    # C++ only supports serial connection
+    DRONE_ADDRESS="serial:/dev/ttyACM0:57600"
 
     # Run RC monitor
     DRONE_ADDRESS="$DRONE_ADDRESS" ./main rc-monitor

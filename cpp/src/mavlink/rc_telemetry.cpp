@@ -5,14 +5,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <common/mavlink.h>
 
 namespace mavlink_impl {
 
-RCTelemetry::RCTelemetry() : fd(-1), connected(false), is_serial(false) {
+RCTelemetry::RCTelemetry() : fd(-1), connected(false) {
 }
 
 RCTelemetry::~RCTelemetry() {
@@ -23,60 +20,21 @@ RCTelemetry::~RCTelemetry() {
 
 void RCTelemetry::connect(const std::string& address) {
     // Parse serial connection (format: serial:/dev/ttyACM0:57600)
-    if (address.find("serial:") == 0) {
-        std::string addr_str = address.substr(7); // Remove "serial:"
-        size_t colon_pos = addr_str.find(':');
-
-        if (colon_pos == std::string::npos) {
-            throw std::runtime_error("Invalid serial format. Expected serial:/dev/ttyXXX:baudrate");
-        }
-
-        std::string device = addr_str.substr(0, colon_pos);
-        int baudrate = std::stoi(addr_str.substr(colon_pos + 1));
-
-        connect_serial(device, baudrate);
-        is_serial = true;
-        return;
+    if (address.find("serial:") != 0) {
+        throw std::runtime_error("Only serial connections are supported. Expected format: serial:/dev/ttyXXX:baudrate");
     }
 
-    // Parse UDP address (format: udpin://0.0.0.0:14540)
-    std::string addr_str = address;
-    if (addr_str.find("udpin://") == 0) {
-        addr_str = addr_str.substr(8);
-    }
-
+    std::string addr_str = address.substr(7); // Remove "serial:"
     size_t colon_pos = addr_str.find(':');
+
     if (colon_pos == std::string::npos) {
-        throw std::runtime_error("Invalid UDP format. Expected udpin://host:port");
+        throw std::runtime_error("Invalid serial format. Expected serial:/dev/ttyXXX:baudrate");
     }
 
-    std::string ip = addr_str.substr(0, colon_pos);
-    int port = std::stoi(addr_str.substr(colon_pos + 1));
+    std::string device = addr_str.substr(0, colon_pos);
+    int baudrate = std::stoi(addr_str.substr(colon_pos + 1));
 
-    connect_udp(ip, port);
-    is_serial = false;
-}
-
-void RCTelemetry::connect_udp(const std::string& ip, int port) {
-    // Create UDP socket
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) {
-        throw std::runtime_error("Failed to create socket");
-    }
-
-    // Bind to address
-    sockaddr_in local_addr{};
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_addr.s_addr = INADDR_ANY;
-    local_addr.sin_port = htons(port);
-
-    if (bind(fd, (sockaddr*)&local_addr, sizeof(local_addr)) < 0) {
-        close(fd);
-        throw std::runtime_error("Failed to bind socket");
-    }
-
-    std::cout << "Connected to " << ip << ":" << port << std::endl;
-    connected = true;
+    connect_serial(device, baudrate);
 }
 
 void RCTelemetry::connect_serial(const std::string& device, int baudrate) {
@@ -131,18 +89,6 @@ void RCTelemetry::connect_serial(const std::string& device, int baudrate) {
     connected = true;
 }
 
-ssize_t RCTelemetry::read_data(uint8_t* buf, size_t len) {
-    if (is_serial) {
-        return read(fd, buf, len);
-    } else {
-        // Set timeout for UDP socket
-        struct timeval tv;
-        tv.tv_sec = 1;
-        tv.tv_usec = 0;
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-        return recv(fd, buf, len, 0);
-    }
-}
 
 void RCTelemetry::monitor_rc_channels() {
     std::cout << "\n-- Monitoring RC Channels --" << std::endl;
@@ -154,7 +100,7 @@ void RCTelemetry::monitor_rc_channels() {
     mavlink_status_t status;
 
     while (true) {
-        ssize_t n = read_data(buf, sizeof(buf));
+        ssize_t n = read(fd, buf, sizeof(buf));
         if (n > 0) {
             for (ssize_t i = 0; i < n; i++) {
                 if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status)) {
