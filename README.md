@@ -1,15 +1,20 @@
 # mav_pixhawk_px4
 
-This repository provides MAVLink-based drone control implementations in multiple languages:
-
-- **Python**: MAVSDK-Python (high-level) & PyMAVLink (low-level)
-- **Rust**: Direct MAVLink protocol implementation
+Multi-language MAVLink implementations for drone control and telemetry.
 
 ## Prerequisites
 
 - [just](https://github.com/casey/just) - Command runner
-- [PX4 with external modules](https://github.com/comverser/px4_with_extern_modules) must be running (SITL)
+- [PX4 SITL](https://github.com/comverser/px4_with_extern_modules) - Only for UDP/SITL connections
 
-## Usage
+## Quick Start
 
-See [justfile](justfile) for all available commands and recipes.
+```bash
+just
+```
+
+## Languages
+
+- Python
+- C++
+- Rust

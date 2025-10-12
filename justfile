@@ -39,8 +39,12 @@ python-clean:
 # C++
 # ============================================================================
 
+# Setup C++ dependencies
+cpp-setup:
+    @test -d cpp/external/mavlink || (cd cpp && git clone --depth 1 https://github.com/mavlink/c_library_v2.git external/mavlink)
+
 # Build C++ project
-cpp-build:
+cpp-build: cpp-setup
     @mkdir -p cpp/build
     @cd cpp/build && cmake .. && make
 
