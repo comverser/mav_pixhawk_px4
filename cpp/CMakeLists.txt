@@ -4,7 +4,8 @@ project(mavlink_px4_cpp)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# TODO: Add MAVLink library
+# MAVLink headers (header-only library)
+set(MAVLINK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/mavlink")
 
 # Main executable
 add_executable(main
@@ -13,7 +14,6 @@ add_executable(main
     src/mavlink/rc_telemetry.cpp
 )
 
-# TODO: Uncomment when MAVLink library is added
-# target_link_libraries(main mavlink)
+target_include_directories(main PRIVATE ${MAVLINK_INCLUDE_DIR})
 
 # TODO: MAVSDK implementation placeholder

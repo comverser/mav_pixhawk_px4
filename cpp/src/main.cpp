@@ -14,11 +14,16 @@ int main(int argc, char* argv[]) {
 
     std::string command = argv[1];
 
-    if (command == "rc-monitor") {
-        mavlink_impl::RCTelemetry rc_telem;
-        rc_telem.start();
-    } else {
-        std::cerr << "Unknown command: " << command << std::endl;
+    try {
+        if (command == "rc-monitor") {
+            mavlink_impl::RCTelemetry rc_telem;
+            rc_telem.start();
+        } else {
+            std::cerr << "Unknown command: " << command << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
 
