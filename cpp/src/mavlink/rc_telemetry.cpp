@@ -68,6 +68,7 @@ void RCTelemetry::connect_serial(const std::string& device, int baudrate) {
         case 38400: speed = B38400; break;
         case 57600: speed = B57600; break;
         case 115200: speed = B115200; break;
+        case 921600: speed = B921600; break;
         default:
             close(fd);
             throw std::runtime_error("Unsupported baud rate: " + std::to_string(baudrate));

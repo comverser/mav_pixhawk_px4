@@ -2,7 +2,11 @@
 # Global Commands
 # ============================================================================
 
-default: run
+default: menu
+
+# Main interactive menu
+menu: setup
+    @just _main-menu
 
 # Interactive run - choose language and command
 run: setup
@@ -12,6 +16,10 @@ run: setup
 setup:
     git pull --rebase --autostash
     git submodule update --init --remote
+
+# Interactive Pixhawk configuration
+config: python-setup
+    @just _config-interactive
 
 # Clean all build artifacts
 clean: python-clean cpp-clean rust-clean
@@ -72,6 +80,70 @@ rust-clean:
 # ============================================================================
 # Internal Helpers
 # ============================================================================
+
+# Main menu
+_main-menu:
+    #!/usr/bin/env bash
+    echo "Select Option:"
+    echo "  1. Python [default]"
+    echo "  2. C++"
+    echo "  3. Rust"
+    echo "  4. Configure Pixhawk"
+    echo ""
+    read -p "Choice [1]: " main_choice
+    main_choice=${main_choice:-1}
+
+    case $main_choice in
+        1)
+            just python-run
+            ;;
+        2)
+            just cpp-run
+            ;;
+        3)
+            just rust-run
+            ;;
+        4)
+            just _config-interactive
+            ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
+    esac
+
+# Interactive Pixhawk configuration menu
+_config-interactive:
+    #!/usr/bin/env bash
+    echo "Pixhawk Configuration:"
+    echo "  1. List parameters (filter: MAV/SER)"
+    echo "  2. Configure TELEM 2 (921600 baud) [default]"
+    echo "  3. Reboot Pixhawk"
+    echo ""
+    read -p "Choice [2]: " config_choice
+    config_choice=${config_choice:-2}
+
+    case $config_choice in
+        1)
+            echo ""
+            echo "Listing MAVLink and Serial parameters..."
+            python/venv/bin/python3 config/list_all_params.py MAV
+            echo ""
+            python/venv/bin/python3 config/list_all_params.py SER
+            ;;
+        2)
+            echo ""
+            python/venv/bin/python3 config/configure_telem2.py
+            ;;
+        3)
+            echo ""
+            python/venv/bin/python3 config/reboot_pixhawk.py
+            ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
+    esac
 
 # Select language interactively
 _select-language:
@@ -183,8 +255,27 @@ _cpp-interactive:
     #!/usr/bin/env bash
     cd cpp/build
 
-    # C++ only supports serial connection
-    DRONE_ADDRESS="serial:/dev/ttyACM0:57600"
+    # Select serial device
+    echo ""
+    echo "Select Serial Device:"
+    echo "  1. /dev/ttyACM0 (USB, 57600 baud) [default]"
+    echo "  2. /dev/ttyAMA0 (TELEM 2, 921600 baud)"
+    echo ""
+    read -p "Choice [1]: " device_choice
+    device_choice=${device_choice:-1}
+
+    case $device_choice in
+        1)
+            DRONE_ADDRESS="serial:/dev/ttyACM0:57600"
+            ;;
+        2)
+            DRONE_ADDRESS="serial:/dev/ttyAMA0:921600"
+            ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
+    esac
 
     # Run RC monitor
     DRONE_ADDRESS="$DRONE_ADDRESS" ./main rc-monitor
