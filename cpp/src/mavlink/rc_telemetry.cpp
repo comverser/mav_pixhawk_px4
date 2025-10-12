@@ -1,22 +1,30 @@
 #include "rc_telemetry.hpp"
 #include "../config.hpp"
-#include <iostream>
-#include <cstring>
-#include <unistd.h>
+#include <common/mavlink.h>
 #include <fcntl.h>
 #include <termios.h>
-#include <common/mavlink.h>
+#include <unistd.h>
+#include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace mavlink_impl {
 
-RCTelemetry::RCTelemetry() : fd(-1), connected(false) {
-}
+// ============================================================================
+// Constructor / Destructor
+// ============================================================================
+
+RCTelemetry::RCTelemetry() : fd(-1) {}
 
 RCTelemetry::~RCTelemetry() {
     if (fd >= 0) {
         close(fd);
     }
 }
+
+// ============================================================================
+// Connection
+// ============================================================================
 
 void RCTelemetry::connect(const std::string& address) {
     // Parse serial connection (format: serial:/dev/ttyACM0:57600)
@@ -86,9 +94,11 @@ void RCTelemetry::connect_serial(const std::string& device, int baudrate) {
     }
 
     std::cout << "Connected to " << device << " at " << baudrate << " baud" << std::endl;
-    connected = true;
 }
 
+// ============================================================================
+// Monitoring
+// ============================================================================
 
 void RCTelemetry::monitor_rc_channels() {
     std::cout << "\n-- Monitoring RC Channels --" << std::endl;
@@ -123,19 +133,14 @@ void RCTelemetry::monitor_rc_channels() {
     }
 }
 
+// ============================================================================
+// Public Interface
+// ============================================================================
+
 void RCTelemetry::start() {
     std::string address = config::get_connection_address();
     connect(address);
     monitor_rc_channels();
-}
-
-void RCTelemetry::stop() {
-    connected = false;
-    if (fd >= 0) {
-        close(fd);
-        fd = -1;
-    }
-    std::cout << "\nMonitoring complete" << std::endl;
 }
 
 } // namespace mavlink_impl
