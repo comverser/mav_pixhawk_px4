@@ -9,7 +9,7 @@ using namespace mavsdk;
 int main() {
     std::string address = config::get_connection_address();
 
-    Mavsdk mavsdk{Mavsdk::Configuration{Mavsdk::ComponentType::GroundStation}};
+    Mavsdk mavsdk{Mavsdk::Configuration{ComponentType::GroundStation}};
 
     std::cout << "Checking heartbeat..." << std::endl;
 
