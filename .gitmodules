@@ -1,3 +1,6 @@
 [submodule "cpp/external/mavlink"]
 	path = cpp/external/mavlink
 	url = https://github.com/mavlink/c_library_v2.git
+[submodule "cpp/external/mavsdk"]
+	path = cpp/external/mavsdk
+	url = https://github.com/mavlink/MAVSDK.git
