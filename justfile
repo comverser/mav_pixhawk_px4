@@ -4,22 +4,17 @@
 
 default: menu
 
-# Setup: Pull latest changes and update submodules
+# Pull latest changes and update submodules
 setup:
     git pull --rebase --autostash
     git submodule update --init --remote
 
-# Main interactive menu
+# Interactive menu to select language and run examples
 menu: setup
-    @just _main-menu
+    @just _menu
 
-# Interactive run - choose language and command
-run: setup
-    @just _select-language
-
-# Configure Pixhawk interactively
-config: python-setup
-    @just _config-interactive
+# Interactive run (alias for menu)
+run: menu
 
 # Clean all build artifacts (Python, C++, Rust)
 clean: python-clean cpp-clean rust-clean
@@ -28,10 +23,10 @@ clean: python-clean cpp-clean rust-clean
 # Python
 # ============================================================================
 
-# Setup Python environment
+# Setup Python virtual environment and dependencies
 python-setup:
-    @cd python && test -d venv || python3 -m venv venv
-    @cd python && venv/bin/pip install -q -r requirements.txt
+    @test -d python/venv || python3 -m venv python/venv
+    @python/venv/bin/pip install -q -r python/requirements.txt
 
 # Run Python examples interactively
 python-run: python-setup
@@ -108,81 +103,28 @@ rust-clean:
 # Internal Helpers
 # ============================================================================
 
-# --- Main Menus ---
-
-_main-menu:
-    #!/usr/bin/env bash
-    echo "Select Option:"
-    echo "  1. Python [default]"
-    echo "  2. C++"
-    echo "  3. Rust"
-    echo "  4. Configure Pixhawk"
-    echo ""
-    read -p "Choice [1]: " main_choice
-    main_choice=${main_choice:-1}
-
-    case $main_choice in
-        1) just python-run ;;
-        2) just cpp-run ;;
-        3) just rust-run ;;
-        4) just _config-interactive ;;
-        *)
-            echo "Invalid choice"
-            exit 1
-            ;;
-    esac
-
-_config-interactive:
-    #!/usr/bin/env bash
-    echo "Pixhawk Configuration:"
-    echo "  1. Configure TELEM 2 (921600 baud) [default]"
-    echo "  2. List parameters (filter: MAV/SER)"
-    echo "  3. Reboot Pixhawk"
-    echo ""
-    read -p "Choice [1]: " config_choice
-    config_choice=${config_choice:-1}
-
-    case $config_choice in
-        1)
-            echo ""
-            python/venv/bin/python3 config/configure_telem2.py
-            ;;
-        2)
-            echo ""
-            echo "Listing MAVLink and Serial parameters..."
-            python/venv/bin/python3 config/list_all_params.py MAV
-            echo ""
-            python/venv/bin/python3 config/list_all_params.py SER
-            ;;
-        3)
-            echo ""
-            python/venv/bin/python3 config/reboot_pixhawk.py
-            ;;
-        *)
-            echo "Invalid choice"
-            exit 1
-            ;;
-    esac
-
-# --- Common Helpers ---
-
-_select-language:
+# Main menu
+_menu:
     #!/usr/bin/env bash
     echo "Select Language:"
     echo "  1. Python [default]"
     echo "  2. C++"
     echo "  3. Rust"
     echo ""
-    read -p "Choice [1]: " lang_choice
-    lang_choice=${lang_choice:-1}
+    read -p "Choice [1]: " choice
+    choice=${choice:-1}
 
-    case $lang_choice in
+    case $choice in
         1) just python-run ;;
         2) just cpp-run ;;
         3) just rust-run ;;
-        *) echo "Invalid choice"; exit 1 ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
     esac
 
+# Get connection string based on format
 _get-connection format="python":
     #!/usr/bin/env bash
     # Print prompts to stderr so they don't get captured
@@ -210,8 +152,7 @@ _get-connection format="python":
             ;;
     esac
 
-# --- Language Interactive ---
-
+# Python interactive menu
 _python-interactive:
     #!/usr/bin/env bash
     cd python
@@ -263,6 +204,7 @@ _python-interactive:
             ;;
     esac
 
+# C++ interactive menu
 _cpp-interactive:
     #!/usr/bin/env bash
     cd cpp/build
@@ -316,6 +258,7 @@ _cpp-interactive:
             ;;
     esac
 
+# Rust interactive menu
 _rust-interactive:
     #!/usr/bin/env bash
     cd rust
