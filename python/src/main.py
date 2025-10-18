@@ -4,6 +4,7 @@ import sys
 from src.mavsdk.commands import flight, shell, offboard
 from src.mavsdk.telemetry import ekf
 from src.mavlink.telemetry import rc_channels
+from src.config import pixhawk
 
 
 def main(argv: list[str] = None) -> None:
@@ -42,6 +43,18 @@ def main(argv: list[str] = None) -> None:
     elif args[0] == "rc-monitor":
         duration = float(args[1]) if len(args) > 1 else 10.0
         asyncio.run(rc_channels.monitor_rc_channels(duration))
+
+    # Configuration & Diagnostics
+    elif args[0] == "test-connection":
+        if len(args) < 2:
+            print("Usage: test-connection <port> [baud]")
+            sys.exit(1)
+        port = args[1]
+        baud = int(args[2]) if len(args) > 2 else 57600
+        success = pixhawk.test_connection(port, baud)
+        sys.exit(0 if success else 1)
+    elif args[0] == "scan-ports":
+        pixhawk.scan_ports()
 
     else:
         print(f"Unknown command: {args[0]}")

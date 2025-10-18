@@ -1,4 +1,4 @@
-"""Shared configuration utilities"""
+"""Connection configuration utilities"""
 import os
 
 
