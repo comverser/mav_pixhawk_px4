@@ -130,7 +130,8 @@ _get-connection format="python":
     # Print prompts to stderr so they don't get captured
     echo "Select Connection:" >&2
     echo "  1. UDP SITL [default]" >&2
-    echo "  2. Serial" >&2
+    echo "  2. Serial USB (/dev/ttyACM0, 57600 baud)" >&2
+    echo "  3. TELEM 2 (/dev/ttyAMA10, 921600 baud)" >&2
     echo "" >&2
     read -p "Choice [1]: " conn_choice
     conn_choice=${conn_choice:-1}
@@ -144,7 +145,18 @@ _get-connection format="python":
             fi
             ;;
         2)
-            echo "serial:/dev/ttyACM0:57600"
+            if [ "{{format}}" = "python" ]; then
+                echo "serial:///dev/ttyACM0:57600"
+            else
+                echo "serial:/dev/ttyACM0:57600"
+            fi
+            ;;
+        3)
+            if [ "{{format}}" = "python" ]; then
+                echo "serial:///dev/ttyAMA10:921600"
+            else
+                echo "serial:/dev/ttyAMA10:921600"
+            fi
             ;;
         *)
             echo "Invalid choice" >&2
@@ -175,6 +187,20 @@ _python-interactive:
     echo "    6. RC status"
     echo "    7. RC monitor"
     echo ""
+    echo "  Connection Testing:"
+    echo "    8. Scan ports"
+    echo "    9. Heartbeat monitor"
+    echo ""
+    echo "  Configuration:"
+    echo "    10. Check TELEM2 config"
+    echo "    11. Configure TELEM2"
+    echo "    12. Reboot Pixhawk"
+    echo ""
+    echo "  Diagnostics:"
+    echo "    13. Raw serial monitor (TELEM2)"
+    echo "    14. Dump all parameters"
+    echo "    15. Scan TELEM2 baud rates"
+    echo ""
     read -p "Choice [1]: " cmd_choice
     cmd_choice=${cmd_choice:-1}
 
@@ -197,6 +223,39 @@ _python-interactive:
             read -p "Duration [10]: " duration
             duration=${duration:-10}
             DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "$duration"
+            ;;
+        8) python -m src.main scan-ports ;;
+        9)
+            read -p "Duration [10]: " duration
+            duration=${duration:-10}
+            # Convert DRONE_ADDRESS to pymavlink format for heartbeat monitor
+            # serial:///dev/ttyACM0:57600 -> /dev/ttyACM0,57600
+            CONNECTION=$(echo "$DRONE_ADDRESS" | sed 's|serial://||' | sed 's|:/|/|' | sed 's|:\([0-9]*\)$|,\1|')
+            python -m src.main heartbeat-monitor "$CONNECTION" "$duration"
+            ;;
+        10) python -m src.main check-telem2 ;;
+        11)
+            read -p "TELEM2 baudrate [921600]: " telem_baud
+            telem_baud=${telem_baud:-921600}
+            python -m src.main configure-telem2 /dev/ttyACM0 57600 "$telem_baud"
+            ;;
+        12) python -m src.main reboot ;;
+        13)
+            read -p "Serial port [/dev/ttyAMA10]: " serial_port
+            serial_port=${serial_port:-/dev/ttyAMA10}
+            read -p "Baud rate [921600]: " serial_baud
+            serial_baud=${serial_baud:-921600}
+            read -p "Duration [10]: " duration
+            duration=${duration:-10}
+            python -m src.main serial-monitor "$serial_port" "$serial_baud" "$duration"
+            ;;
+        14) python -m src.main param-dump ;;
+        15)
+            read -p "Serial port [/dev/ttyAMA10]: " serial_port
+            serial_port=${serial_port:-/dev/ttyAMA10}
+            read -p "Test duration per baud [3]: " duration
+            duration=${duration:-3}
+            python -m src.main baud-scan "$serial_port" "$duration"
             ;;
         *)
             echo "Invalid choice"
@@ -222,7 +281,7 @@ _cpp-interactive:
     echo ""
     echo "Select Serial Device:"
     echo "  1. /dev/ttyACM0 (USB, 57600 baud) [default]"
-    echo "  2. /dev/ttyAMA0 (TELEM 2, 921600 baud)"
+    echo "  2. /dev/ttyAMA10 (TELEM 2, 921600 baud)"
     echo ""
     read -p "Choice [1]: " device_choice
     device_choice=${device_choice:-1}
@@ -233,7 +292,7 @@ _cpp-interactive:
             BAUDRATE="57600"
             ;;
         2)
-            DEVICE="/dev/ttyAMA0"
+            DEVICE="/dev/ttyAMA10"
             BAUDRATE="921600"
             ;;
         *)
