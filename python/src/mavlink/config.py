@@ -1,6 +1,7 @@
 """Pixhawk configuration utilities"""
 from pymavlink import mavutil
 import time
+import os
 
 
 def _connect(port: str, baud: int):
@@ -75,15 +76,19 @@ def reboot(port: str, baud: int) -> None:
         print("\nWaiting for connection to drop...", end="", flush=True)
         time.sleep(2)
 
-        for i in range(10):
-            msg = mav.recv_match(type='HEARTBEAT', blocking=False, timeout=0.5)
-            if not msg:
-                print(" ✓ Connection dropped")
-                break
-            print(".", end="", flush=True)
-            time.sleep(0.5)
-        else:
-            print(" ⚠ Connection still alive")
+        try:
+            for i in range(10):
+                msg = mav.recv_match(type='HEARTBEAT', blocking=False, timeout=0.5)
+                if not msg:
+                    print(" ✓ Connection dropped")
+                    break
+                print(".", end="", flush=True)
+                time.sleep(0.5)
+            else:
+                print(" ⚠ Connection still alive")
+        except Exception:
+            # Serial disconnect during reboot is expected
+            print(" ✓ Connection dropped")
 
         print("Waiting for Pixhawk to boot (15s)...", end="", flush=True)
         for _ in range(15):
@@ -91,15 +96,36 @@ def reboot(port: str, baud: int) -> None:
             print(".", end="", flush=True)
         print()
 
-        print("\nReconnecting...")
-        mav = mavutil.mavlink_connection(f"{port},{baud}")
-        msg = mav.wait_heartbeat(timeout=30)
+        print("\nWaiting for device to reappear...", end="", flush=True)
+        device_found = False
+        for _ in range(15):
+            if os.path.exists(port):
+                print(" ✓ Device found")
+                device_found = True
+                break
+            print(".", end="", flush=True)
+            time.sleep(1)
 
-        if msg:
-            print(f"✓ Pixhawk rebooted successfully!")
-            print(f"  System ID: {mav.target_system}")
-        else:
-            print("✗ Failed to reconnect after reboot")
+        if not device_found:
+            print(f" ✗ Device {port} did not reappear")
+            return
+
+        print("Reconnecting...", end="", flush=True)
+        for attempt in range(5):
+            try:
+                time.sleep(1)
+                mav = mavutil.mavlink_connection(f"{port},{baud}")
+                msg = mav.wait_heartbeat(timeout=10)
+                if msg:
+                    print(" ✓")
+                    print(f"✓ Pixhawk rebooted successfully!")
+                    print(f"  System ID: {mav.target_system}")
+                    return
+            except Exception:
+                print(".", end="", flush=True)
+
+        print(" ✗")
+        print("✗ Failed to reconnect after reboot")
 
     except Exception as e:
         print(f"Error: {e}")
