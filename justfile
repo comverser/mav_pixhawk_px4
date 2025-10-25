@@ -198,9 +198,21 @@ _python-interactive:
             CONNECTION=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:/|/|;s|:\([0-9]*\)$|,\1|')
             python -m src.main heartbeat-monitor "$CONNECTION" "${duration:-10}"
             ;;
-        9) python -m src.main configure-telem2 /dev/ttyACM0 57600 ;;
-        10) python -m src.main reset-params /dev/ttyACM0 57600 ;;
-        11) python -m src.main reboot /dev/ttyACM0 57600 ;;
+        9)
+            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
+            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            python -m src.main configure-telem2 "$PORT" "$BAUD"
+            ;;
+        10)
+            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
+            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            python -m src.main reset-params "$PORT" "$BAUD"
+            ;;
+        11)
+            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
+            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            python -m src.main reboot "$PORT" "$BAUD"
+            ;;
         *) echo "Invalid choice"; exit 1 ;;
     esac
 
