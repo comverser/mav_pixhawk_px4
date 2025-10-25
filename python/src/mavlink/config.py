@@ -136,7 +136,6 @@ def configure_telem2(port: str, baud: int) -> None:
     try:
         mav = _connect(port, baud)
 
-        # Only set MAV_1_CONFIG - PX4 auto-configures other params after reboot
         print("Setting MAV_1_CONFIG = 102 (TELEM 2)...")
         mav.mav.param_set_send(
             mav.target_system,

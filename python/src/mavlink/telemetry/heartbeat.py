@@ -14,11 +14,28 @@ def monitor_heartbeat(connection_string: str, duration: float = 10.0) -> None:
     print(f"Connecting to {connection_string}...")
     print("Waiting for heartbeat...")
 
-    try:
-        mav = mavutil.mavlink_connection(connection_string)
-        msg = mav.wait_heartbeat(timeout=10)
+    mav = None
+    msg = None
 
-        if not msg:
+    try:
+        # Retry connection a few times with delays
+        for attempt in range(3):
+            try:
+                mav = mavutil.mavlink_connection(connection_string)
+                msg = mav.wait_heartbeat(timeout=10)
+                if msg:
+                    break
+                if attempt < 2:
+                    print("No heartbeat, retrying...")
+                    time.sleep(2)
+            except Exception as e:
+                if attempt < 2:
+                    print(f"Connection error, retrying... ({e})")
+                    time.sleep(2)
+                else:
+                    raise
+
+        if not msg or not mav:
             print("No heartbeat received")
             return
 

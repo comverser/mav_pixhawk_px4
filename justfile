@@ -131,9 +131,13 @@ _menu:
 # Connection selection helper (MAVSDK format with :// separator)
 _get-connection format="mavsdk":
     #!/usr/bin/env bash
+    # Auto-detect USB device
+    USB_DEV=$(ls /dev/ttyACM* 2>/dev/null | head -1)
+    USB_DEV=${USB_DEV:-/dev/ttyACM0}
+
     echo "Select Connection:" >&2
     echo "  1. UDP SITL [default]" >&2
-    echo "  2. USB Serial (/dev/ttyACM0, 57600 baud)" >&2
+    echo "  2. USB Serial ($USB_DEV, 57600 baud)" >&2
     echo "  3. TELEM2 (/dev/ttyAMA0, 921600 baud)" >&2
     echo "" >&2
     read -p "Choice [1]: " choice
@@ -141,7 +145,7 @@ _get-connection format="mavsdk":
 
     case $choice in
         1) echo "udpin://0.0.0.0:14540" ;;
-        2) echo "serial:///dev/ttyACM0:57600" ;;
+        2) echo "serial://$USB_DEV:57600" ;;
         3) echo "serial:///dev/ttyAMA0:921600" ;;
         *) echo "Invalid choice" >&2; exit 1 ;;
     esac
