@@ -169,7 +169,8 @@ _python-interactive:
     echo ""
     echo "Configuration:"
     echo "  9. Configure TELEM2"
-    echo "  10. Reboot Pixhawk"
+    echo "  10. Reset parameters to defaults"
+    echo "  11. Reboot Pixhawk"
     echo ""
     read -p "Choice [1]: " choice
     choice=${choice:-1}
@@ -198,7 +199,8 @@ _python-interactive:
             python -m src.main heartbeat-monitor "$CONNECTION" "${duration:-10}"
             ;;
         9) python -m src.main configure-telem2 /dev/ttyACM0 57600 ;;
-        10) python -m src.main reboot /dev/ttyACM0 57600 ;;
+        10) python -m src.main reset-params /dev/ttyACM0 57600 ;;
+        11) python -m src.main reboot /dev/ttyACM0 57600 ;;
         *) echo "Invalid choice"; exit 1 ;;
     esac
 

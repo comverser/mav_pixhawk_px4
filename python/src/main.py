@@ -48,6 +48,11 @@ def main(argv: list[str] = None) -> None:
             args[1] if len(args) > 1 else "/dev/ttyACM0",
             int(args[2]) if len(args) > 2 else 57600
         )
+    elif cmd == "reset-params":
+        config.reset_params(
+            args[1] if len(args) > 1 else "/dev/ttyACM0",
+            int(args[2]) if len(args) > 2 else 57600
+        )
     elif cmd == "reboot":
         config.reboot(
             args[1] if len(args) > 1 else "/dev/ttyACM0",
