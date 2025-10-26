@@ -43,7 +43,7 @@ COMMAND_HANDLERS: dict[str, Callable[[list[str]], Any]] = {
     ),
 
     # Configuration commands (sync)
-    "read-telem2-params": lambda args: config.read_telem2_params(*_parse_serial_args(args)),
+    "compare-params": lambda args: config.compare_params_with_defaults(*_parse_serial_args(args)),
     "configure-telem2": lambda args: config.configure_telem2(*_parse_serial_args(args)),
     "reset-params": lambda args: config.reset_params(*_parse_serial_args(args)),
     "reboot": lambda args: config.reboot(*_parse_serial_args(args)),

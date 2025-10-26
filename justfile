@@ -190,7 +190,7 @@ _python-interactive:
     echo "  8. Heartbeat monitor"
     echo ""
     echo "Configuration:"
-    echo "  9. Read TELEM2 parameters"
+    echo "  9. Compare parameters with defaults"
     echo "  10. Configure TELEM2"
     echo "  11. Reset parameters to defaults"
     echo "  12. Reboot Pixhawk"
@@ -223,7 +223,7 @@ _python-interactive:
             ;;
         9)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
-            python -m src.main read-telem2-params "$PORT" "$BAUD"
+            python -m src.main compare-params "$PORT" "$BAUD"
             ;;
         10)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
