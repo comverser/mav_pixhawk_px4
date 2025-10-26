@@ -2,48 +2,30 @@
 from pymavlink import mavutil
 import time
 
+from src.mavlink import connection
 
-def monitor_heartbeat(connection_string: str, duration: float = 10.0) -> None:
+
+def monitor_heartbeat(address: str, duration: float = 10.0) -> None:
     """
     Monitor heartbeat messages continuously.
 
     Args:
-        connection_string: MAVLink connection string (e.g., "/dev/ttyACM0,57600")
+        address: MAVLink connection address in MAVSDK format (e.g., "serial:///dev/ttyACM0:57600")
         duration: Duration to monitor in seconds
     """
-    print(f"Connecting to {connection_string}...")
-    print("Waiting for heartbeat...")
-
-    mav = None
-    msg = None
-
     try:
-        # Retry connection a few times with delays
-        for attempt in range(3):
-            try:
-                mav = mavutil.mavlink_connection(connection_string)
-                msg = mav.wait_heartbeat(timeout=10)
-                if msg:
-                    break
-                if attempt < 2:
-                    print("No heartbeat, retrying...")
-                    time.sleep(2)
-            except Exception as e:
-                if attempt < 2:
-                    print(f"Connection error, retrying... ({e})")
-                    time.sleep(2)
-                else:
-                    raise
+        # Use centralized connection with stabilization
+        mav = connection.connect(address)
 
-        if not msg or not mav:
-            print("No heartbeat received")
-            return
+        # Get the next heartbeat to display detailed info
+        msg = mav.recv_match(type='HEARTBEAT', blocking=True, timeout=5)
+        if not msg:
+            print("Warning: Could not get heartbeat details")
+        else:
+            print(f"  MAVLink version: {msg.mavlink_version}")
+            print(f"  Autopilot: {msg.autopilot}")
+            print(f"  Vehicle type: {msg.type}")
 
-        print(f"Connected to system {mav.target_system}")
-        print(f"  Component ID: {mav.target_component}")
-        print(f"  MAVLink version: {msg.mavlink_version}")
-        print(f"  Autopilot: {msg.autopilot}")
-        print(f"  Vehicle type: {msg.type}")
         print()
         print(f"Monitoring heartbeat for {duration} seconds...")
         print("=" * 70)

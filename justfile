@@ -218,8 +218,7 @@ _python-interactive:
             ;;
         8)
             read -p "Duration [{{DEFAULT_DURATION}}]: " duration
-            CONNECTION=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:/|/|;s|:\([0-9]*\)$|,\1|')
-            python -m src.main heartbeat-monitor "$CONNECTION" "${duration:-{{DEFAULT_DURATION}}}"
+            python -m src.main heartbeat-monitor "$DRONE_ADDRESS" "${duration:-{{DEFAULT_DURATION}}}"
             ;;
         9)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")

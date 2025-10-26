@@ -14,6 +14,7 @@ from src.common.constants import (
     RECONNECT_ATTEMPTS,
 )
 from src.mavlink.parameters import encode_param_value, decode_param_value
+from src.mavlink import connection
 
 # ============================================================================
 # Constants
@@ -38,6 +39,7 @@ INT_PARAM_TYPES = [1, 2, 3, 4, 5, 6]  # INT8, UINT8, INT16, UINT16, INT32, UINT3
 # ============================================================================
 # Connection Helpers
 # ============================================================================
+# Note: Connection logic centralized in src.mavlink.connection module
 
 def _handle_error(e: Exception, show_traceback: bool = False):
     """Standardized error handling for configuration commands.
@@ -52,41 +54,6 @@ def _handle_error(e: Exception, show_traceback: bool = False):
         print("\nFull error details:")
         traceback.print_exc()
         print("\nTip: Try unplugging and replugging the Pixhawk, or check if another program is using the serial port")
-
-
-def _connect(port: str, baud: int):
-    """Connect to Pixhawk and wait for heartbeat.
-
-    Args:
-        port: Serial port path
-        baud: Baud rate
-
-    Returns:
-        Connected MAVLink connection
-
-    Raises:
-        TimeoutError: If no heartbeat received
-    """
-    print(f"Connecting to {port} at {baud} baud...")
-    mav = mavutil.mavlink_connection(f"{port},{baud}")
-
-    # Allow connection to stabilize and initialize internal state
-    # This prevents pymavlink race conditions where sysid_state isn't ready
-    time.sleep(0.5)
-
-    # Flush any initial messages to ensure clean state
-    while True:
-        msg = mav.recv_match(blocking=False, timeout=0.1)
-        if msg is None:
-            break
-
-    print("Waiting for heartbeat...")
-    heartbeat = mav.wait_heartbeat(timeout=HEARTBEAT_TIMEOUT)
-    if heartbeat is None:
-        raise TimeoutError(f"No heartbeat received within {HEARTBEAT_TIMEOUT} seconds")
-
-    print(f"Connected to system {mav.target_system}\n")
-    return mav
 
 
 def _send_command_long(mav, command: int, params: list[float], success_msg: str, fail_msg: str) -> bool:
@@ -329,7 +296,7 @@ def _display_comparison_results(
 def reset_params(port: str, baud: int) -> None:
     """Reset all parameters to factory defaults."""
     try:
-        mav = _connect(port, baud)
+        mav = connection.connect(connection.make_serial_address(port, baud))
 
         print("⚠ WARNING: This will reset ALL parameters to factory defaults!")
         confirm = input("Type 'RESET' to confirm: ")
@@ -356,7 +323,7 @@ def reset_params(port: str, baud: int) -> None:
 def reboot(port: str, baud: int) -> None:
     """Reboot Pixhawk and verify it comes back online."""
     try:
-        mav = _connect(port, baud)
+        mav = connection.connect(connection.make_serial_address(port, baud))
 
         print("Sending reboot command...")
         if not _send_command_long(
@@ -424,7 +391,7 @@ def reboot(port: str, baud: int) -> None:
         # Reconnect using the stabilized connection helper
         print("Reconnecting...")
         try:
-            mav = _connect(new_port, baud)
+            mav = connection.connect(connection.make_serial_address(new_port, baud))
             print(f"✓ Pixhawk rebooted successfully!")
             print(f"  System ID: {mav.target_system}")
             if new_port != port:
@@ -446,7 +413,7 @@ def compare_params_with_defaults(port: str, baud: int, reference_file: str = Non
     """
     try:
         # Connect to Pixhawk
-        mav = _connect(port, baud)
+        mav = connection.connect(connection.make_serial_address(port, baud))
 
         # Determine reference file path
         if reference_file is None:
@@ -483,7 +450,7 @@ def compare_params_with_defaults(port: str, baud: int, reference_file: str = Non
 def configure_telem2(port: str, baud: int) -> None:
     """Configure TELEM2 by setting MAV_1_CONFIG = 102 (TELEM 2)."""
     try:
-        mav = _connect(port, baud)
+        mav = connection.connect(connection.make_serial_address(port, baud))
 
         print("Setting MAV_1_CONFIG = 102 (TELEM 2)...")
         # Encode INT32 value for MAVLink transmission
