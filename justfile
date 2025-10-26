@@ -183,17 +183,19 @@ _python-interactive:
     echo "  3. Offboard hover"
     echo ""
     echo "Telemetry:"
-    echo "  4. EKF status"
-    echo "  5. EKF monitor"
-    echo "  6. RC status"
-    echo "  7. RC monitor"
-    echo "  8. Heartbeat monitor"
+    echo "  4. EKF status (MAVLink)"
+    echo "  5. EKF monitor (MAVLink)"
+    echo "  6. EKF status (MAVSDK)"
+    echo "  7. EKF monitor (MAVSDK)"
+    echo "  8. RC status"
+    echo "  9. RC monitor"
+    echo "  10. Heartbeat monitor"
     echo ""
     echo "Configuration:"
-    echo "  9. Compare parameters with defaults"
-    echo "  10. Configure TELEM2"
-    echo "  11. Reset parameters to defaults"
-    echo "  12. Reboot Pixhawk"
+    echo "  11. Compare parameters with defaults"
+    echo "  12. Configure TELEM2"
+    echo "  13. Reset parameters to defaults"
+    echo "  14. Reboot Pixhawk"
     echo ""
     read -p "Choice [1]: " choice
     choice=${choice:-1}
@@ -211,20 +213,25 @@ _python-interactive:
             read -p "Duration [{{DEFAULT_DURATION}}]: " duration
             DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main ekf-monitor "${duration:-{{DEFAULT_DURATION}}}"
             ;;
-        6) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-status ;;
+        6) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main mavsdk-ekf-status ;;
         7)
+            read -p "Duration [{{DEFAULT_DURATION}}]: " duration
+            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main mavsdk-ekf-monitor "${duration:-{{DEFAULT_DURATION}}}"
+            ;;
+        8) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-status ;;
+        9)
             read -p "Duration [{{DEFAULT_DURATION}}]: " duration
             DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "${duration:-{{DEFAULT_DURATION}}}"
             ;;
-        8)
+        10)
             read -p "Duration [{{DEFAULT_DURATION}}]: " duration
             python -m src.main heartbeat-monitor "$DRONE_ADDRESS" "${duration:-{{DEFAULT_DURATION}}}"
             ;;
-        9)
+        11)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main compare-params "$PORT" "$BAUD"
             ;;
-        10)
+        12)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main configure-telem2 "$PORT" "$BAUD"
             if [ $? -eq 0 ]; then
@@ -235,7 +242,7 @@ _python-interactive:
                 fi
             fi
             ;;
-        11)
+        13)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main reset-params "$PORT" "$BAUD"
             if [ $? -eq 0 ]; then
@@ -246,7 +253,7 @@ _python-interactive:
                 fi
             fi
             ;;
-        12)
+        14)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main reboot "$PORT" "$BAUD"
             ;;

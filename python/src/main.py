@@ -4,8 +4,8 @@ import sys
 from typing import Callable, Any
 
 from src.mavsdk.commands import flight, shell, offboard
-from src.mavsdk.telemetry import ekf
-from src.mavlink.telemetry import rc_channels, heartbeat
+from src.mavsdk.telemetry import ekf as mavsdk_ekf
+from src.mavlink.telemetry import rc_channels, heartbeat, ekf as mavlink_ekf
 from src.mavlink import config
 from src.common.constants import DEFAULT_USB_PORT, DEFAULT_USB_BAUD
 
@@ -33,14 +33,18 @@ COMMAND_HANDLERS: dict[str, Callable[[list[str]], Any]] = {
         float(args[5]) if len(args) > 5 else 10.0
     )),
 
-    # Telemetry commands
-    "ekf-status": lambda args: asyncio.run(ekf.ekf_status_once()),  # async (MAVSDK)
-    "ekf-monitor": lambda args: asyncio.run(ekf.monitor_ekf(_parse_duration_arg(args))),  # async (MAVSDK)
-    "rc-status": lambda args: rc_channels.rc_channels_once(),  # sync (MAVLink)
-    "rc-monitor": lambda args: rc_channels.monitor_rc_channels(_parse_duration_arg(args)),  # sync (MAVLink)
-    "heartbeat-monitor": lambda args: heartbeat.monitor_heartbeat(  # sync (MAVLink)
+    # Telemetry commands (MAVLink)
+    "ekf-status": lambda args: mavlink_ekf.ekf_status_once(),
+    "ekf-monitor": lambda args: mavlink_ekf.monitor_ekf(_parse_duration_arg(args)),
+    "rc-status": lambda args: rc_channels.rc_channels_once(),
+    "rc-monitor": lambda args: rc_channels.monitor_rc_channels(_parse_duration_arg(args)),
+    "heartbeat-monitor": lambda args: heartbeat.monitor_heartbeat(
         args[1], _parse_duration_arg(args, start_idx=2)
     ),
+
+    # Telemetry commands (MAVSDK)
+    "mavsdk-ekf-status": lambda args: asyncio.run(mavsdk_ekf.ekf_status_once()),
+    "mavsdk-ekf-monitor": lambda args: asyncio.run(mavsdk_ekf.monitor_ekf(_parse_duration_arg(args))),
 
     # Configuration commands (sync)
     "compare-params": lambda args: config.compare_params_with_defaults(*_parse_serial_args(args)),

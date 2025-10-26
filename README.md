@@ -2,6 +2,12 @@
 
 Multi-language MAVLink implementations for drone control and telemetry.
 
+## Architecture
+
+- **mavlink/**: Direct MAVLink protocol implementation
+- **mavsdk/**: MAVSDK library implementation
+- These directories must remain completely independent (applies to all languages)
+
 ## Prerequisites
 
 - [just](https://github.com/casey/just) - Command runner
