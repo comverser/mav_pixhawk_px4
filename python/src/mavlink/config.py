@@ -56,21 +56,105 @@ def _handle_error(e: Exception, show_traceback: bool = False):
         print("\nTip: Try unplugging and replugging the Pixhawk, or check if another program is using the serial port")
 
 
+def _set_parameter(mav, param_name: str, param_value, param_type: int) -> tuple[bool, any]:
+    """Set a parameter and wait for confirmation.
+
+    Args:
+        mav: Connected MAVLink connection
+        param_name: Parameter name (string)
+        param_value: Encoded parameter value (float for MAVLink)
+        param_type: MAVLink parameter type
+
+    Returns:
+        Tuple of (success: bool, actual_value: any)
+    """
+    # Ensure param_name is bytes with correct length (exactly 16 bytes)
+    param_name_bytes = param_name.encode('utf-8') if isinstance(param_name, str) else param_name
+    if len(param_name_bytes) > 16:
+        param_name_bytes = param_name_bytes[:16]  # Truncate if too long
+    elif len(param_name_bytes) < 16:
+        param_name_bytes = param_name_bytes + b'\x00' * (16 - len(param_name_bytes))  # Pad if too short
+
+    # Send parameter set command
+    mav.mav.param_set_send(
+        mav.target_system,
+        mav.target_component,
+        param_name_bytes,
+        param_value,
+        param_type
+    )
+
+    # Loop to find the specific PARAM_VALUE response (may receive other params first)
+    timeout = time.time() + PARAMETER_READ_TIMEOUT
+    received_other_params = []
+
+    while time.time() < timeout:
+        msg = mav.recv_match(type='PARAM_VALUE', blocking=True, timeout=1.0)
+        if msg:
+            # Decode param_id (comes as bytes with null padding)
+            received_name = msg.param_id.decode('utf-8') if isinstance(msg.param_id, bytes) else msg.param_id
+            received_name = received_name.rstrip('\x00')
+
+            if received_name == param_name:
+                # Found our parameter - decode and return
+                actual_value = decode_param_value(msg.param_value, msg.param_type)
+                return True, actual_value
+            else:
+                # Track other params for diagnostics
+                received_other_params.append(received_name)
+
+    # Timeout - parameter not confirmed, show diagnostics
+    if received_other_params:
+        print(f"  (received {len(received_other_params)} other params, but not {param_name})")
+    else:
+        print(f"  (no PARAM_VALUE messages received)")
+
+    return False, None
+
+
 def _send_command_long(mav, command: int, params: list[float], success_msg: str, fail_msg: str) -> bool:
-    """Send MAVLink command and check ACK."""
+    """Send MAVLink command and check ACK with detailed diagnostics."""
+    # Flush any stale COMMAND_ACK messages
+    while True:
+        msg = mav.recv_match(type='COMMAND_ACK', blocking=False, timeout=0.1)
+        if msg is None:
+            break
+
+    # Send command
     mav.mav.command_long_send(
         mav.target_system,
         mav.target_component,
         command,
         0, *params
     )
+
+    # Wait for acknowledgment
     msg = mav.recv_match(type='COMMAND_ACK', blocking=True, timeout=COMMAND_ACK_TIMEOUT)
-    if msg and msg.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+
+    if msg is None:
+        print(f"{fail_msg} (timeout - no ACK received)")
+        return False
+
+    if msg.command != command:
+        print(f"{fail_msg} (ACK for wrong command: expected {command}, got {msg.command})")
+        return False
+
+    if msg.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
         print(success_msg)
         return True
-    else:
-        print(fail_msg)
-        return False
+
+    # Decode error result for better diagnostics
+    result_names = {
+        1: "TEMPORARILY_REJECTED",
+        2: "DENIED",
+        3: "UNSUPPORTED",
+        4: "FAILED",
+        5: "IN_PROGRESS",
+        6: "CANCELLED"
+    }
+    result_name = result_names.get(msg.result, f"UNKNOWN({msg.result})")
+    print(f"{fail_msg} (result: {result_name})")
+    return False
 
 
 # ============================================================================
@@ -131,7 +215,7 @@ def _read_all_params(mav) -> Dict[str, Dict]:
     expected_count = None
 
     while time.time() < timeout:
-        msg = mav.recv_match(type='PARAM_VALUE', blocking=False, timeout=0.5)
+        msg = mav.recv_match(type='PARAM_VALUE', blocking=True, timeout=0.5)
         if msg:
             last_msg_time = time.time()
             param_id = msg.param_id.decode('utf-8') if isinstance(msg.param_id, bytes) else msg.param_id
@@ -352,6 +436,13 @@ def reboot(port: str, baud: int) -> None:
             # Serial disconnect during reboot is expected
             print(" ✓ Connection dropped")
 
+        # Close the connection to release the serial port
+        # This prevents the device number from changing (e.g., ttyACM0 → ttyACM1)
+        try:
+            mav.close()
+        except Exception:
+            pass  # Connection may already be closed
+
         print(f"Waiting for Pixhawk to boot ({REBOOT_WAIT_SECONDS}s)...", end="", flush=True)
         for _ in range(REBOOT_WAIT_SECONDS):
             time.sleep(1)
@@ -453,34 +544,25 @@ def configure_telem2(port: str, baud: int) -> None:
         mav = connection.connect(connection.make_serial_address(port, baud))
 
         print("Setting MAV_1_CONFIG = 102 (TELEM 2)...")
-        # Encode INT32 value for MAVLink transmission
-        int_value = 102
-        param_value = encode_param_value(int_value, mavutil.mavlink.MAV_PARAM_TYPE_INT32)
 
-        mav.mav.param_set_send(
-            mav.target_system,
-            mav.target_component,
-            b'MAV_1_CONFIG',
+        # Encode INT32 value for MAVLink transmission
+        param_value = encode_param_value(102, mavutil.mavlink.MAV_PARAM_TYPE_INT32)
+
+        # Use centralized parameter setter
+        success, actual_value = _set_parameter(
+            mav,
+            'MAV_1_CONFIG',
             param_value,
             mavutil.mavlink.MAV_PARAM_TYPE_INT32
         )
 
-        msg = mav.recv_match(type='PARAM_VALUE', blocking=True, timeout=PARAMETER_READ_TIMEOUT)
-        if msg and msg.param_id == 'MAV_1_CONFIG':
-            # Decode the response
-            actual_value = decode_param_value(msg.param_value, msg.param_type)
+        if success:
             print(f"  ✓ MAV_1_CONFIG = {actual_value}")
-
-        print("\nSaving to flash...")
-        _send_command_long(
-            mav,
-            mavutil.mavlink.MAV_CMD_PREFLIGHT_STORAGE,
-            [1, 0, 0, 0, 0, 0, 0],
-            "  ✓ Saved",
-            "  ✗ Save failed"
-        )
-
-        print("\n✓ TELEM2 configured. Reboot Pixhawk to apply changes.")
+            print("  ✓ Parameter auto-saved by PX4")
+            print("\n✓ TELEM2 configured. Reboot Pixhawk to apply changes.")
+        else:
+            print("  ✗ Failed to set parameter (timeout)")
+            return
 
     except Exception as e:
         _handle_error(e)
