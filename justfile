@@ -1,4 +1,15 @@
 # ============================================================================
+# Configuration
+# ============================================================================
+
+# Default device paths and baud rates
+USB_PORT := "/dev/ttyACM0"
+UART_PORT := "/dev/ttyAMA0"
+USB_BAUD := "57600"
+UART_BAUD := "921600"
+DEFAULT_DURATION := "10"
+
+# ============================================================================
 # Quick Start
 # ============================================================================
 
@@ -133,22 +144,29 @@ _get-connection format="mavsdk":
     #!/usr/bin/env bash
     # Auto-detect USB device
     USB_DEV=$(ls /dev/ttyACM* 2>/dev/null | head -1)
-    USB_DEV=${USB_DEV:-/dev/ttyACM0}
+    USB_DEV=${USB_DEV:-{{USB_PORT}}}
 
     echo "Select Connection:" >&2
     echo "  1. UDP SITL [default]" >&2
-    echo "  2. USB Serial ($USB_DEV, 57600 baud)" >&2
-    echo "  3. TELEM2 (/dev/ttyAMA0, 921600 baud)" >&2
+    echo "  2. USB Serial ($USB_DEV, {{USB_BAUD}} baud)" >&2
+    echo "  3. TELEM2 ({{UART_PORT}}, {{UART_BAUD}} baud)" >&2
     echo "" >&2
     read -p "Choice [1]: " choice
     choice=${choice:-1}
 
     case $choice in
         1) echo "udpin://0.0.0.0:14540" ;;
-        2) echo "serial://$USB_DEV:57600" ;;
-        3) echo "serial:///dev/ttyAMA0:921600" ;;
+        2) echo "serial://$USB_DEV:{{USB_BAUD}}" ;;
+        3) echo "serial://{{UART_PORT}}:{{UART_BAUD}}" ;;
         *) echo "Invalid choice" >&2; exit 1 ;;
     esac
+
+# Parse serial connection string to port and baud (for pymavlink)
+_parse-serial-connection connection:
+    #!/usr/bin/env bash
+    PORT=$(echo "{{connection}}" | sed 's|serial://||;s|:.*||')
+    BAUD=$(echo "{{connection}}" | sed 's|.*:||')
+    echo "$PORT $BAUD"
 
 # Python interactive menu
 _python-interactive:
@@ -190,37 +208,33 @@ _python-interactive:
         3) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main offboard-hover ;;
         4) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main ekf-status ;;
         5)
-            read -p "Duration [10]: " duration
-            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main ekf-monitor "${duration:-10}"
+            read -p "Duration [{{DEFAULT_DURATION}}]: " duration
+            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main ekf-monitor "${duration:-{{DEFAULT_DURATION}}}"
             ;;
         6) DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-status ;;
         7)
-            read -p "Duration [10]: " duration
-            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "${duration:-10}"
+            read -p "Duration [{{DEFAULT_DURATION}}]: " duration
+            DRONE_ADDRESS="$DRONE_ADDRESS" python -m src.main rc-monitor "${duration:-{{DEFAULT_DURATION}}}"
             ;;
         8)
-            read -p "Duration [10]: " duration
+            read -p "Duration [{{DEFAULT_DURATION}}]: " duration
             CONNECTION=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:/|/|;s|:\([0-9]*\)$|,\1|')
-            python -m src.main heartbeat-monitor "$CONNECTION" "${duration:-10}"
+            python -m src.main heartbeat-monitor "$CONNECTION" "${duration:-{{DEFAULT_DURATION}}}"
             ;;
         9)
-            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
-            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main read-telem2-params "$PORT" "$BAUD"
             ;;
         10)
-            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
-            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main configure-telem2 "$PORT" "$BAUD"
             ;;
         11)
-            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
-            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main reset-params "$PORT" "$BAUD"
             ;;
         12)
-            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
-            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main reboot "$PORT" "$BAUD"
             ;;
         *) echo "Invalid choice"; exit 1 ;;
@@ -241,15 +255,15 @@ _cpp-interactive:
 
     echo ""
     echo "Device:"
-    echo "  1. USB (/dev/ttyACM0, 57600 baud) [default]"
-    echo "  2. TELEM2 (/dev/ttyAMA0, 921600 baud)"
+    echo "  1. USB ({{USB_PORT}}, {{USB_BAUD}} baud) [default]"
+    echo "  2. TELEM2 ({{UART_PORT}}, {{UART_BAUD}} baud)"
     echo ""
     read -p "Choice [1]: " device
     device=${device:-1}
 
     case $device in
-        1) DEV="/dev/ttyACM0"; BAUD="57600" ;;
-        2) DEV="/dev/ttyAMA0"; BAUD="921600" ;;
+        1) DEV="{{USB_PORT}}"; BAUD="{{USB_BAUD}}" ;;
+        2) DEV="{{UART_PORT}}"; BAUD="{{UART_BAUD}}" ;;
         *) echo "Invalid choice"; exit 1 ;;
     esac
 

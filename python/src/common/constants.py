@@ -1,0 +1,17 @@
+"""Application-wide constants"""
+
+# Default serial connection settings
+DEFAULT_USB_PORT = "/dev/ttyACM0"
+DEFAULT_UART_PORT = "/dev/ttyAMA0"
+DEFAULT_USB_BAUD = 57600
+DEFAULT_UART_BAUD = 921600
+
+# Connection timeouts
+HEARTBEAT_TIMEOUT = 10
+COMMAND_ACK_TIMEOUT = 5
+PARAMETER_READ_TIMEOUT = 3
+
+# Reboot settings
+REBOOT_WAIT_SECONDS = 15
+DEVICE_POLL_ATTEMPTS = 15
+RECONNECT_ATTEMPTS = 5
