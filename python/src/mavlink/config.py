@@ -356,7 +356,16 @@ def _display_comparison_results(
 
     # Verdict
     print("\n" + "=" * 80)
-    if len(config_differences) == 0 and len(auto_cal_differences) == 0:
+
+    # Check if we actually read any parameters
+    total_current_params = matching + len(config_differences) + len(auto_cal_differences)
+    if total_current_params == 0:
+        print("✗ ERROR: Failed to read any parameters from Pixhawk!")
+        print("  This usually means:")
+        print("  - USB Serial doesn't support parameter messages (use TELEM2 instead)")
+        print("  - Connection bandwidth is too low for parameter stream")
+        print("  - MAVLink streams are disabled on this port")
+    elif len(config_differences) == 0 and len(auto_cal_differences) == 0:
         print("✓ VERDICT: Perfect match - device is at firmware defaults!")
     elif len(config_differences) == 0:
         print(f"✓ VERDICT: Device is at firmware defaults!")
