@@ -227,10 +227,24 @@ _python-interactive:
         10)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main configure-telem2 "$PORT" "$BAUD"
+            if [ $? -eq 0 ]; then
+                echo ""
+                read -p "Reboot now to apply changes? [Y/n]: " reboot_choice
+                if [ -z "$reboot_choice" ] || [ "$reboot_choice" = "y" ] || [ "$reboot_choice" = "Y" ]; then
+                    python -m src.main reboot "$PORT" "$BAUD"
+                fi
+            fi
             ;;
         11)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
             python -m src.main reset-params "$PORT" "$BAUD"
+            if [ $? -eq 0 ]; then
+                echo ""
+                read -p "Reboot now to apply changes? [Y/n]: " reboot_choice
+                if [ -z "$reboot_choice" ] || [ "$reboot_choice" = "y" ] || [ "$reboot_choice" = "Y" ]; then
+                    python -m src.main reboot "$PORT" "$BAUD"
+                fi
+            fi
             ;;
         12)
             read -r PORT BAUD <<< $(just _parse-serial-connection "$DRONE_ADDRESS")
