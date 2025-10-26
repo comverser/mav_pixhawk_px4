@@ -172,9 +172,10 @@ _python-interactive:
     echo "  8. Heartbeat monitor"
     echo ""
     echo "Configuration:"
-    echo "  9. Configure TELEM2"
-    echo "  10. Reset parameters to defaults"
-    echo "  11. Reboot Pixhawk"
+    echo "  9. Read TELEM2 parameters"
+    echo "  10. Configure TELEM2"
+    echo "  11. Reset parameters to defaults"
+    echo "  12. Reboot Pixhawk"
     echo ""
     read -p "Choice [1]: " choice
     choice=${choice:-1}
@@ -205,14 +206,19 @@ _python-interactive:
         9)
             PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
             BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
-            python -m src.main configure-telem2 "$PORT" "$BAUD"
+            python -m src.main read-telem2-params "$PORT" "$BAUD"
             ;;
         10)
             PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
             BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
-            python -m src.main reset-params "$PORT" "$BAUD"
+            python -m src.main configure-telem2 "$PORT" "$BAUD"
             ;;
         11)
+            PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
+            BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
+            python -m src.main reset-params "$PORT" "$BAUD"
+            ;;
+        12)
             PORT=$(echo "$DRONE_ADDRESS" | sed 's|serial://||;s|:.*||')
             BAUD=$(echo "$DRONE_ADDRESS" | sed 's|.*:||')
             python -m src.main reboot "$PORT" "$BAUD"

@@ -43,6 +43,11 @@ def main(argv: list[str] = None) -> None:
         heartbeat.monitor_heartbeat(args[1], float(args[2]) if len(args) > 2 else 10.0)
 
     # Configuration
+    elif cmd == "read-telem2-params":
+        config.read_telem2_params(
+            args[1] if len(args) > 1 else "/dev/ttyACM0",
+            int(args[2]) if len(args) > 2 else 57600
+        )
     elif cmd == "configure-telem2":
         config.configure_telem2(
             args[1] if len(args) > 1 else "/dev/ttyACM0",

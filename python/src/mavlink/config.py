@@ -2,6 +2,57 @@
 from pymavlink import mavutil
 import time
 import os
+import struct
+
+
+def _encode_param_value(value: int, param_type: int) -> float:
+    """Convert integer value to float for MAVLink parameter transmission.
+
+    For integer parameter types, pack the integer as bytes and unpack as float.
+    """
+    type_map = {
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT8: ('B', 'f'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT8: ('b', 'f'),
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT16: ('H', 'f'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT16: ('h', 'f'),
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT32: ('I', 'f'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT32: ('i', 'f'),
+    }
+
+    if param_type in type_map:
+        int_fmt, float_fmt = type_map[param_type]
+        # Pack as integer bytes, pad to 4 bytes, unpack as float
+        int_bytes = struct.pack(int_fmt, value)
+        padded_bytes = int_bytes + b'\x00' * (4 - len(int_bytes))
+        return struct.unpack(float_fmt, padded_bytes)[0]
+    else:
+        # For REAL32, just return as float
+        return float(value)
+
+
+def _decode_param_value(param_value: float, param_type: int) -> int:
+    """Convert float from MAVLink parameter to actual integer value.
+
+    For integer parameter types, pack the float as bytes and unpack as integer.
+    """
+    type_map = {
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT8: ('f', 'B'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT8: ('f', 'b'),
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT16: ('f', 'H'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT16: ('f', 'h'),
+        mavutil.mavlink.MAV_PARAM_TYPE_UINT32: ('f', 'I'),
+        mavutil.mavlink.MAV_PARAM_TYPE_INT32: ('f', 'i'),
+    }
+
+    if param_type in type_map:
+        float_fmt, int_fmt = type_map[param_type]
+        # Pack as float bytes, extract needed bytes, unpack as integer
+        float_bytes = struct.pack(float_fmt, param_value)
+        int_size = struct.calcsize(int_fmt)
+        return struct.unpack(int_fmt, float_bytes[:int_size])[0]
+    else:
+        # For REAL32, just return as int
+        return int(param_value)
 
 
 def _connect(port: str, baud: int):
@@ -98,28 +149,47 @@ def reboot(port: str, baud: int) -> None:
 
         print("\nWaiting for device to reappear...", end="", flush=True)
         device_found = False
+        new_port = None
+
+        # Check if port is a USB ACM device
+        is_usb_acm = port.startswith('/dev/ttyACM')
+
         for _ in range(15):
-            if os.path.exists(port):
-                print(" ✓ Device found")
-                device_found = True
-                break
+            if is_usb_acm:
+                # For USB devices, check for any /dev/ttyACM* device
+                import glob
+                acm_devices = glob.glob('/dev/ttyACM*')
+                if acm_devices:
+                    new_port = acm_devices[0]
+                    print(f" ✓ Device found at {new_port}")
+                    device_found = True
+                    break
+            else:
+                # For other devices (like UART), check exact path
+                if os.path.exists(port):
+                    new_port = port
+                    print(" ✓ Device found")
+                    device_found = True
+                    break
             print(".", end="", flush=True)
             time.sleep(1)
 
         if not device_found:
-            print(f" ✗ Device {port} did not reappear")
+            print(f" ✗ Device did not reappear")
             return
 
         print("Reconnecting...", end="", flush=True)
         for attempt in range(5):
             try:
                 time.sleep(1)
-                mav = mavutil.mavlink_connection(f"{port},{baud}")
+                mav = mavutil.mavlink_connection(f"{new_port},{baud}")
                 msg = mav.wait_heartbeat(timeout=10)
                 if msg:
                     print(" ✓")
                     print(f"✓ Pixhawk rebooted successfully!")
                     print(f"  System ID: {mav.target_system}")
+                    if new_port != port:
+                        print(f"  Device path changed: {port} → {new_port}")
                     return
             except Exception:
                 print(".", end="", flush=True)
@@ -131,23 +201,88 @@ def reboot(port: str, baud: int) -> None:
         print(f"Error: {e}")
 
 
+def read_telem2_params(port: str, baud: int) -> None:
+    """Read and display current MAV_1_* parameter values."""
+    try:
+        mav = _connect(port, baud)
+
+        params = ['MAV_1_CONFIG', 'MAV_1_MODE', 'MAV_1_FLOW_CTRL', 'MAV_1_FORWARD', 'MAV_1_RATE']
+        param_values = {}
+
+        print("Reading current MAV_1_* parameters...\n")
+
+        # Allow connection to stabilize
+        time.sleep(0.5)
+
+        # Try up to 3 times to get all parameters
+        for attempt in range(3):
+            # Request any missing parameters
+            missing_params = [p for p in params if p not in param_values]
+            if not missing_params:
+                break
+
+            if attempt > 0:
+                print(f"Retry {attempt}: requesting {len(missing_params)} missing parameter(s)...")
+
+            for param_name in missing_params:
+                mav.mav.param_request_read_send(
+                    mav.target_system,
+                    mav.target_component,
+                    param_name.encode('utf-8'),
+                    -1
+                )
+                time.sleep(0.15)  # Longer delay to avoid overwhelming
+
+            # Collect responses
+            timeout = time.time() + 3
+            while time.time() < timeout:
+                msg = mav.recv_match(type='PARAM_VALUE', blocking=False, timeout=0.5)
+                if msg:
+                    param_id = msg.param_id.decode('utf-8') if isinstance(msg.param_id, bytes) else msg.param_id
+                    param_id = param_id.rstrip('\x00')
+                    if param_id in params and param_id not in param_values:
+                        int_value = _decode_param_value(msg.param_value, msg.param_type)
+                        print(f"DEBUG: Received {param_id}: raw_value={msg.param_value}, type={msg.param_type}, int_value={int_value}")
+                        param_values[param_id] = int_value
+                if len(param_values) == len(params):
+                    break
+
+        print()  # Blank line after debug output
+
+        # Display results
+        for param_name in params:
+            if param_name in param_values:
+                print(f"{param_name:20} = {param_values[param_name]}")
+            else:
+                print(f"{param_name:20} = <not found>")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
 def configure_telem2(port: str, baud: int) -> None:
     """Configure TELEM2 by setting MAV_1_CONFIG = 102 (TELEM 2)."""
     try:
         mav = _connect(port, baud)
 
         print("Setting MAV_1_CONFIG = 102 (TELEM 2)...")
+        # Encode INT32 value for MAVLink transmission
+        int_value = 102
+        param_value = _encode_param_value(int_value, mavutil.mavlink.MAV_PARAM_TYPE_INT32)
+
         mav.mav.param_set_send(
             mav.target_system,
             mav.target_component,
             b'MAV_1_CONFIG',
-            102,
+            param_value,
             mavutil.mavlink.MAV_PARAM_TYPE_INT32
         )
 
         msg = mav.recv_match(type='PARAM_VALUE', blocking=True, timeout=3)
         if msg and msg.param_id == 'MAV_1_CONFIG':
-            print(f"  ✓ MAV_1_CONFIG = {int(msg.param_value)}")
+            # Decode the response
+            actual_value = _decode_param_value(msg.param_value, msg.param_type)
+            print(f"  ✓ MAV_1_CONFIG = {actual_value}")
 
         print("\nSaving to flash...")
         _send_command_long(
