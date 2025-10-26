@@ -1,9 +1,9 @@
 """RC channel telemetry via MAVLink"""
-import asyncio
+import time
 from src.mavlink.connection import connect
 
 
-async def monitor_rc_channels(duration: float = 10.0) -> None:
+def monitor_rc_channels(duration: float = 10.0) -> None:
     """Monitor RC channel values for specified duration."""
     mav = connect()
 
@@ -11,10 +11,10 @@ async def monitor_rc_channels(duration: float = 10.0) -> None:
     print("Ch1-4 typically: Roll, Pitch, Throttle, Yaw")
     print("Values range: 1000-2000 (1500 = center)\n")
 
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.time()
 
-    while (asyncio.get_event_loop().time() - start_time) < duration:
-        # Non-blocking receive with timeout
+    while (time.time() - start_time) < duration:
+        # Blocking receive with timeout
         msg = mav.recv_match(type='RC_CHANNELS', blocking=True, timeout=1.0)
 
         if msg:
@@ -30,12 +30,12 @@ async def monitor_rc_channels(duration: float = 10.0) -> None:
                   f"CH5: {channels[4]:4d} | CH6: {channels[5]:4d} | "
                   f"CH7: {channels[6]:4d} | CH8: {channels[7]:4d}")
 
-        await asyncio.sleep(0.1)  # Small delay to prevent CPU spinning
+        time.sleep(0.1)  # Small delay between readings
 
     print("\nMonitoring complete")
 
 
-async def rc_channels_once() -> None:
+def rc_channels_once() -> None:
     """Get single snapshot of RC channel values."""
     mav = connect()
 

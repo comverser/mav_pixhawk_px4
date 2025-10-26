@@ -33,12 +33,12 @@ COMMAND_HANDLERS: dict[str, Callable[[list[str]], Any]] = {
         float(args[5]) if len(args) > 5 else 10.0
     )),
 
-    # Telemetry commands (async)
-    "ekf-status": lambda args: asyncio.run(ekf.ekf_status_once()),
-    "ekf-monitor": lambda args: asyncio.run(ekf.monitor_ekf(_parse_duration_arg(args))),
-    "rc-status": lambda args: asyncio.run(rc_channels.rc_channels_once()),
-    "rc-monitor": lambda args: asyncio.run(rc_channels.monitor_rc_channels(_parse_duration_arg(args))),
-    "heartbeat-monitor": lambda args: heartbeat.monitor_heartbeat(
+    # Telemetry commands
+    "ekf-status": lambda args: asyncio.run(ekf.ekf_status_once()),  # async (MAVSDK)
+    "ekf-monitor": lambda args: asyncio.run(ekf.monitor_ekf(_parse_duration_arg(args))),  # async (MAVSDK)
+    "rc-status": lambda args: rc_channels.rc_channels_once(),  # sync (MAVLink)
+    "rc-monitor": lambda args: rc_channels.monitor_rc_channels(_parse_duration_arg(args)),  # sync (MAVLink)
+    "heartbeat-monitor": lambda args: heartbeat.monitor_heartbeat(  # sync (MAVLink)
         args[1], _parse_duration_arg(args, start_idx=2)
     ),
 
