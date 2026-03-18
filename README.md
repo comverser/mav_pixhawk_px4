@@ -19,6 +19,16 @@ Multi-language MAVLink implementations for drone control and telemetry.
 - **USB Serial**: `/dev/ttyACM0` at 57600 baud
 - **UART**: `/dev/ttyAMA0` (GPIO 14/15)
 
+#### UART Setup
+
+Enable UART on GPIO 14/15 by adding the following to `/boot/firmware/config.txt`:
+
+```
+dtoverlay=uart0-pi5
+```
+
+Reboot to apply. This creates `/dev/ttyAMA0` for TELEM2 connections.
+
 ### Pixhawk
 - **Firmware**: PX4 latest
 
