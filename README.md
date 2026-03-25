@@ -41,10 +41,23 @@ Log out and back in (or run `newgrp dialout`) for the group change to take effec
 
 #### Disable Serial Console
 
-The kernel serial console (`console=serial0,115200`) must be removed from `/boot/firmware/cmdline.txt` when using UART for Pixhawk communication. MAVLink binary data on ttyAMA0 gets interpreted as SysRq key commands, which can trigger instant reboots, emergency filesystem remounts, and other destructive kernel actions.
+The serial console and login shell on ttyAMA0 must be disabled when using UART for Pixhawk communication. MAVLink binary data gets interpreted as SysRq key commands, which can trigger instant reboots, emergency filesystem remounts, and other destructive kernel actions.
+
+Via `raspi-config` (recommended):
+
+```bash
+sudo raspi-config
+# Interface Options → Serial Port
+#   Login shell over serial: No
+#   Serial port hardware enabled: Yes
+```
+
+Or manually:
 
 ```bash
 sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt
+sudo systemctl stop serial-getty@ttyAMA0.service
+sudo systemctl disable serial-getty@ttyAMA0.service
 ```
 
 Reboot to apply.
