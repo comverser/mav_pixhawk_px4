@@ -60,7 +60,14 @@ sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt
 
 The `serial-getty@ttyAMA0.service` is auto-generated from the `console=` kernel parameter, so removing it from cmdline.txt also eliminates the login shell.
 
-Reboot to apply.
+Reboot to apply, then verify:
+
+```bash
+cat /proc/cmdline | grep -o 'console=[^ ]*'  # should only show console=tty1
+systemctl is-enabled serial-getty@ttyAMA0.service  # should show disabled or not found
+ls /dev/ttyAMA0  # should still exist
+journalctl -b 0 | grep -c sysrq  # should be 0
+```
 
 #### Persistent Journal
 
