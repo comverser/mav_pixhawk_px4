@@ -138,8 +138,8 @@ router-install:
     rm -rf "$tmpdir"
     echo "mavlink-router installed successfully"
 
-# Start forwarding TELEM2 to remote QGC: just router-start icarus-airship.iptime.org
-router-start QGC_HOST:
+# Start forwarding TELEM2 to remote QGC
+router-start:
     #!/usr/bin/env bash
     # Resolve hostname to IP if needed
     QGC_IP=$(getent ahostsv4 "{{QGC_HOST}}" | head -1 | awk '{print $1}')
@@ -207,8 +207,8 @@ router-stop:
 router-status:
     sudo systemctl status mavlink-router --no-pager
 
-# Enable mavlink-router on boot with default QGC host
-router-enable: (router-start QGC_HOST)
+# Enable mavlink-router on boot
+router-enable: router-start
 
 # Disable mavlink-router on boot
 router-disable:
