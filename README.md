@@ -56,9 +56,9 @@ Or manually:
 
 ```bash
 sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt
-sudo systemctl stop serial-getty@ttyAMA0.service
-sudo systemctl disable serial-getty@ttyAMA0.service
 ```
+
+The `serial-getty@ttyAMA0.service` is auto-generated from the `console=` kernel parameter, so removing it from cmdline.txt also eliminates the login shell.
 
 Reboot to apply.
 
