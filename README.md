@@ -39,6 +39,16 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 Log out and back in (or run `newgrp dialout`) for the group change to take effect.
 
+#### Disable Serial Console
+
+The kernel serial console (`console=serial0,115200`) must be removed from `/boot/firmware/cmdline.txt` when using UART for Pixhawk communication. MAVLink binary data on ttyAMA0 gets interpreted as SysRq key commands, which can trigger instant reboots, emergency filesystem remounts, and other destructive kernel actions.
+
+```bash
+sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt
+```
+
+Reboot to apply.
+
 #### Persistent Journal
 
 Raspberry Pi OS defaults to volatile journal storage (RAM only), so all logs are lost on unexpected shutdown. Enable persistent journal to preserve logs across reboots:
