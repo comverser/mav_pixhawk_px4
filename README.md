@@ -51,7 +51,7 @@ Verify on the GCS (requires [ffmpeg](https://www.gyan.dev/ffmpeg/builds/)):
 ffplay -fflags nobuffer -flags low_delay -framedrop -i udp://0.0.0.0:5600
 ```
 
-QGC settings: Video Source = `UDP h.264 Video Stream`, Port = `5600`
+QGC settings: Video Source = `MPEG-TS Video Stream`, UDP URL = `0.0.0.0:5600`
 
 ## Hardware Configuration
 

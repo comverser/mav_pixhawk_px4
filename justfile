@@ -243,7 +243,7 @@ stream-start:
     After=network-online.target
 
     [Service]
-    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -i {{CAMERA_URL}} -vf scale=640:360 -c:v libx264 -preset ultrafast -tune zerolatency -b:v 300k -maxrate 400k -bufsize 300k -g 15 -keyint_min 15 -x264opts repeat-headers=1 -an -f mpegts -muxrate 500k -pkt_size 1316 udp://$QGC_IP:{{QGC_VIDEO_PORT}}?pkt_size=1316
+    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -i {{CAMERA_URL}} -vf scale=640:360 -c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -level 3.1 -b:v 300k -maxrate 400k -bufsize 300k -g 15 -keyint_min 15 -x264opts repeat-headers=1 -an -f mpegts udp://$QGC_IP:{{QGC_VIDEO_PORT}}?pkt_size=1316
     Restart=always
     RestartSec=3
 
