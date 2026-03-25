@@ -10,6 +10,9 @@ UART_BAUD := "921600"
 DEFAULT_DURATION := "10"
 QGC_PORT := "14550"
 QGC_HOST := "icarus-airship.iptime.org"
+QGC_VIDEO_HOST := "icarus-airship.iptime.org"
+QGC_VIDEO_PORT := "5600"
+CAMERA_URL := "rtsp://192.168.144.25:8554/main.264"
 
 # ============================================================================
 # Quick Start
@@ -219,6 +222,57 @@ router-disable:
 # Show mavlink-router logs
 router-log:
     sudo journalctl -u mavlink-router -f
+
+# ============================================================================
+# Video Stream (forward camera RTSP to remote QGroundControl via UDP)
+# ============================================================================
+
+# Start forwarding camera stream to remote QGC
+stream-start:
+    #!/usr/bin/env bash
+    # Resolve hostname to IP
+    QGC_IP=$(getent ahostsv4 "{{QGC_VIDEO_HOST}}" | head -1 | awk '{print $1}')
+    if [ -z "$QGC_IP" ]; then
+        echo "Failed to resolve {{QGC_VIDEO_HOST}}"
+        exit 1
+    fi
+    echo "Resolved {{QGC_VIDEO_HOST}} -> $QGC_IP"
+    sudo tee /etc/systemd/system/video-stream.service > /dev/null <<EOF
+    [Unit]
+    Description=Video stream relay to QGC
+    After=network-online.target
+
+    [Service]
+    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -i {{CAMERA_URL}} -vf scale=640:360 -c:v libx264 -preset ultrafast -tune zerolatency -b:v 300k -maxrate 400k -bufsize 300k -g 15 -keyint_min 15 -x264opts repeat-headers=1 -an -f mpegts -muxrate 500k -pkt_size 1316 udp://$QGC_IP:{{QGC_VIDEO_PORT}}?pkt_size=1316
+    Restart=always
+    RestartSec=3
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable video-stream
+    sudo systemctl restart video-stream
+    echo "Streaming {{CAMERA_URL}} -> $QGC_IP:{{QGC_VIDEO_PORT}}"
+    sudo systemctl status video-stream --no-pager
+
+# Stop video stream
+stream-stop:
+    sudo systemctl stop video-stream
+
+# Show video stream status
+stream-status:
+    sudo systemctl status video-stream --no-pager
+
+# Disable video stream on boot
+stream-disable:
+    sudo systemctl disable video-stream
+    sudo systemctl stop video-stream
+    echo "video-stream disabled and stopped"
+
+# Show video stream logs
+stream-log:
+    sudo journalctl -u video-stream -f
 
 # ============================================================================
 # Internal Helpers

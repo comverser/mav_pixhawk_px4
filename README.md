@@ -32,6 +32,27 @@ just router-start <QGC_SERVER_IP>
 
 Other commands: `just router-stop`, `just router-status`, `just router-log`
 
+### Video Stream
+
+Forward camera RTSP stream to a remote QGroundControl instance via UDP MPEG-TS.
+
+Start and manage:
+
+```bash
+just stream-start
+just stream-stop
+just stream-status
+just stream-log
+```
+
+Verify on the GCS (requires [ffmpeg](https://www.gyan.dev/ffmpeg/builds/)):
+
+```powershell
+ffplay -fflags nobuffer -flags low_delay -framedrop -i udp://0.0.0.0:5600
+```
+
+QGC settings: Video Source = `UDP h.264 Video Stream`, Port = `5600`
+
 ## Hardware Configuration
 
 ### Raspberry Pi 5
