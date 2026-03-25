@@ -13,6 +13,25 @@ Multi-language MAVLink implementations for drone control and telemetry.
 - [just](https://github.com/casey/just) - Command runner
 - [PX4 SITL](https://github.com/comverser/px4_with_extern_modules) - Only for UDP/SITL connections
 
+### MAVLink Router
+
+Forward TELEM2 to a remote QGroundControl instance over UDP.
+
+Build dependencies:
+
+```bash
+sudo apt-get install -y git meson ninja-build pkg-config gcc g++ python3 libsystemd-dev
+```
+
+Install and start:
+
+```bash
+just router-install
+just router-start <QGC_SERVER_IP>
+```
+
+Other commands: `just router-stop`, `just router-status`, `just router-log`
+
 ## Hardware Configuration
 
 ### Raspberry Pi 5

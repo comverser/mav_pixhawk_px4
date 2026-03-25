@@ -8,6 +8,8 @@ UART_PORT := "/dev/ttyAMA0"
 USB_BAUD := "57600"
 UART_BAUD := "921600"
 DEFAULT_DURATION := "10"
+QGC_PORT := "14550"
+QGC_HOST := "icarus-airship.iptime.org"
 
 # ============================================================================
 # Quick Start
@@ -113,6 +115,110 @@ rust-run: rust-build
 # Clean Rust build artifacts
 rust-clean:
     @test -d rust/target && cd rust && cargo clean || true
+
+# ============================================================================
+# MAVLink Router (forward TELEM2 to remote QGroundControl)
+# ============================================================================
+
+# Install mavlink-router from source
+router-install:
+    #!/usr/bin/env bash
+    if command -v mavlink-routerd &> /dev/null; then
+        echo "mavlink-router already installed: $(mavlink-routerd --version 2>&1 || echo 'ok')"
+        exit 0
+    fi
+    sudo apt-get update && sudo apt-get install -y git meson ninja-build pkg-config gcc g++ python3 libsystemd-dev
+    tmpdir=$(mktemp -d)
+    git clone https://github.com/mavlink-router/mavlink-router.git "$tmpdir"
+    cd "$tmpdir"
+    git submodule update --init --recursive
+    meson setup build . -Dsystemdsystemunitdir=/usr/lib/systemd/system
+    ninja -C build
+    sudo ninja -C build install
+    rm -rf "$tmpdir"
+    echo "mavlink-router installed successfully"
+
+# Start forwarding TELEM2 to remote QGC: just router-start icarus-airship.iptime.org
+router-start QGC_HOST:
+    #!/usr/bin/env bash
+    # Resolve hostname to IP if needed
+    QGC_IP=$(getent ahostsv4 "{{QGC_HOST}}" | head -1 | awk '{print $1}')
+    if [ -z "$QGC_IP" ]; then
+        echo "Failed to resolve {{QGC_HOST}}"
+        exit 1
+    fi
+    echo "Resolved {{QGC_HOST}} -> $QGC_IP"
+    sudo mkdir -p /etc/mavlink-router
+    sudo tee /etc/mavlink-router/main.conf > /dev/null <<CONF
+    [General]
+    TcpServerPort = 0
+    ReportStats = false
+
+    [UartEndpoint telem2]
+    Device = {{UART_PORT}}
+    Baud = {{UART_BAUD}}
+
+    [UdpEndpoint qgc]
+    Mode = Normal
+    Address = $QGC_IP
+    Port = {{QGC_PORT}}
+    CONF
+    # Install resolve script to re-resolve hostname on each start (with retry for boot)
+    sudo tee /usr/local/bin/mavlink-router-resolve > /dev/null <<'SCRIPT'
+    #!/bin/bash
+    HOST=$(grep -oP '# QGC_HOST=\K.*' /etc/mavlink-router/main.conf)
+    [ -z "$HOST" ] && exit 0
+    for i in $(seq 1 10); do
+        IP=$(getent ahostsv4 "$HOST" | head -1 | awk '{print $1}')
+        [ -n "$IP" ] && break
+        echo "Waiting for DNS ($i/10)..."
+        sleep 2
+    done
+    [ -z "$IP" ] && echo "Failed to resolve $HOST" && exit 1
+    sed -i "s/^    Address = .*/    Address = $IP/" /etc/mavlink-router/main.conf
+    echo "Resolved $HOST -> $IP"
+    SCRIPT
+    sudo chmod +x /usr/local/bin/mavlink-router-resolve
+    # Add hostname comment to config for the resolve script
+    grep -q '# QGC_HOST=' /etc/mavlink-router/main.conf || \
+        echo "    # QGC_HOST={{QGC_HOST}}" | sudo tee -a /etc/mavlink-router/main.conf > /dev/null
+    # Create systemd drop-in: wait for network, run resolve, slow restart
+    sudo mkdir -p /etc/systemd/system/mavlink-router.service.d
+    sudo tee /etc/systemd/system/mavlink-router.service.d/resolve-host.conf > /dev/null <<'DROPIN'
+    [Unit]
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    ExecStartPre=/usr/local/bin/mavlink-router-resolve
+    RestartSec=5
+    DROPIN
+    sudo systemctl daemon-reload
+    sudo systemctl enable mavlink-router
+    sudo systemctl restart mavlink-router
+    echo "Forwarding {{UART_PORT}} @ {{UART_BAUD}} -> $QGC_IP:{{QGC_PORT}}"
+    sudo systemctl status mavlink-router --no-pager
+
+# Stop mavlink-router
+router-stop:
+    sudo systemctl stop mavlink-router
+
+# Show mavlink-router status
+router-status:
+    sudo systemctl status mavlink-router --no-pager
+
+# Enable mavlink-router on boot with default QGC host
+router-enable: (router-start QGC_HOST)
+
+# Disable mavlink-router on boot
+router-disable:
+    sudo systemctl disable mavlink-router
+    sudo systemctl stop mavlink-router
+    echo "mavlink-router disabled and stopped"
+
+# Show mavlink-router logs
+router-log:
+    sudo journalctl -u mavlink-router -f
 
 # ============================================================================
 # Internal Helpers
