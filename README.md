@@ -27,7 +27,7 @@ Install and start:
 
 ```bash
 just router-install
-just router-start <QGC_SERVER_IP>
+just router-start
 ```
 
 Other commands: `just router-stop`, `just router-status`, `just router-log`

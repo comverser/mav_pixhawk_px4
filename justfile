@@ -9,10 +9,10 @@ USB_BAUD := "57600"
 UART_BAUD := "921600"
 DEFAULT_DURATION := "10"
 QGC_PORT := "14550"
-QGC_HOST := "icarus-airship.iptime.org"
-QGC_VIDEO_HOST := "icarus-airship.iptime.org"
+QGC_HOST := "211.60.101.110"
 QGC_VIDEO_PORT := "5600"
 CAMERA_URL := "rtsp://192.168.144.25:8554/main.264"
+LTE_IFACE := "wwan0"
 
 # ============================================================================
 # Quick Start
@@ -120,6 +120,27 @@ rust-clean:
     @test -d rust/target && cd rust && cargo clean || true
 
 # ============================================================================
+# LTE Route Pinning
+# ============================================================================
+
+# Install helper script to pin host traffic to LTE interface
+_lte-route-install:
+    #!/usr/bin/env bash
+    sudo tee /usr/local/bin/ensure-lte-route > /dev/null <<'SCRIPT'
+    #!/bin/sh
+    HOST="$1"
+    IFACE="$2"
+    GW=$(ip route show default dev "$IFACE" 2>/dev/null | head -1 | cut -d' ' -f3)
+    if [ -n "$GW" ]; then
+        ip route replace "$HOST/32" via "$GW" dev "$IFACE"
+    else
+        echo "Warning: no default gateway found on $IFACE" >&2
+        exit 1
+    fi
+    SCRIPT
+    sudo chmod +x /usr/local/bin/ensure-lte-route
+
+# ============================================================================
 # MAVLink Router (forward TELEM2 to remote QGroundControl)
 # ============================================================================
 
@@ -142,15 +163,8 @@ router-install:
     echo "mavlink-router installed successfully"
 
 # Start forwarding TELEM2 to remote QGC
-router-start:
+router-start: _lte-route-install
     #!/usr/bin/env bash
-    # Resolve hostname to IP if needed
-    QGC_IP=$(getent ahostsv4 "{{QGC_HOST}}" | head -1 | awk '{print $1}')
-    if [ -z "$QGC_IP" ]; then
-        echo "Failed to resolve {{QGC_HOST}}"
-        exit 1
-    fi
-    echo "Resolved {{QGC_HOST}} -> $QGC_IP"
     sudo mkdir -p /etc/mavlink-router
     sudo tee /etc/mavlink-router/main.conf > /dev/null <<CONF
     [General]
@@ -163,43 +177,24 @@ router-start:
 
     [UdpEndpoint qgc]
     Mode = Normal
-    Address = $QGC_IP
+    Address = {{QGC_HOST}}
     Port = {{QGC_PORT}}
     CONF
-    # Install resolve script to re-resolve hostname on each start (with retry for boot)
-    sudo tee /usr/local/bin/mavlink-router-resolve > /dev/null <<'SCRIPT'
-    #!/bin/bash
-    HOST=$(grep -oP '# QGC_HOST=\K.*' /etc/mavlink-router/main.conf)
-    [ -z "$HOST" ] && exit 0
-    for i in $(seq 1 10); do
-        IP=$(getent ahostsv4 "$HOST" | head -1 | awk '{print $1}')
-        [ -n "$IP" ] && break
-        echo "Waiting for DNS ($i/10)..."
-        sleep 2
-    done
-    [ -z "$IP" ] && echo "Failed to resolve $HOST" && exit 1
-    sed -i "s/^    Address = .*/    Address = $IP/" /etc/mavlink-router/main.conf
-    echo "Resolved $HOST -> $IP"
-    SCRIPT
-    sudo chmod +x /usr/local/bin/mavlink-router-resolve
-    # Add hostname comment to config for the resolve script
-    grep -q '# QGC_HOST=' /etc/mavlink-router/main.conf || \
-        echo "    # QGC_HOST={{QGC_HOST}}" | sudo tee -a /etc/mavlink-router/main.conf > /dev/null
-    # Create systemd drop-in: wait for network, run resolve, slow restart
+    # Create systemd drop-in: wait for network, pin to LTE, slow restart
     sudo mkdir -p /etc/systemd/system/mavlink-router.service.d
-    sudo tee /etc/systemd/system/mavlink-router.service.d/resolve-host.conf > /dev/null <<'DROPIN'
+    sudo tee /etc/systemd/system/mavlink-router.service.d/override.conf > /dev/null <<DROPIN
     [Unit]
     After=network-online.target
     Wants=network-online.target
 
     [Service]
-    ExecStartPre=/usr/local/bin/mavlink-router-resolve
+    ExecStartPre=+/usr/local/bin/ensure-lte-route {{QGC_HOST}} {{LTE_IFACE}}
     RestartSec=5
     DROPIN
     sudo systemctl daemon-reload
     sudo systemctl enable mavlink-router
     sudo systemctl restart mavlink-router
-    echo "Forwarding {{UART_PORT}} @ {{UART_BAUD}} -> $QGC_IP:{{QGC_PORT}}"
+    echo "Forwarding {{UART_PORT}} @ {{UART_BAUD}} -> {{QGC_HOST}}:{{QGC_PORT}}"
     sudo systemctl status mavlink-router --no-pager
 
 # Stop mavlink-router
@@ -228,22 +223,17 @@ router-log:
 # ============================================================================
 
 # Start forwarding camera stream to remote QGC
-stream-start:
+stream-start: _lte-route-install
     #!/usr/bin/env bash
-    # Resolve hostname to IP
-    QGC_IP=$(getent ahostsv4 "{{QGC_VIDEO_HOST}}" | head -1 | awk '{print $1}')
-    if [ -z "$QGC_IP" ]; then
-        echo "Failed to resolve {{QGC_VIDEO_HOST}}"
-        exit 1
-    fi
-    echo "Resolved {{QGC_VIDEO_HOST}} -> $QGC_IP"
     sudo tee /etc/systemd/system/video-stream.service > /dev/null <<EOF
     [Unit]
     Description=Video stream relay to QGC
     After=network-online.target
+    Wants=network-online.target
 
     [Service]
-    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -timeout 5000000 -fflags +genpts+discardcorrupt -i {{CAMERA_URL}} -c:v copy -bsf:v dump_extra -an -f mpegts -mpegts_flags +resend_headers udp://$QGC_IP:{{QGC_VIDEO_PORT}}?pkt_size=1316
+    ExecStartPre=+/usr/local/bin/ensure-lte-route {{QGC_HOST}} {{LTE_IFACE}}
+    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -timeout 5000000 -fflags +genpts+discardcorrupt -i {{CAMERA_URL}} -c:v copy -bsf:v dump_extra -an -f mpegts -mpegts_flags +resend_headers udp://{{QGC_HOST}}:{{QGC_VIDEO_PORT}}?pkt_size=1316
     Restart=always
     RestartSec=3
 
@@ -253,7 +243,7 @@ stream-start:
     sudo systemctl daemon-reload
     sudo systemctl enable video-stream
     sudo systemctl restart video-stream
-    echo "Streaming {{CAMERA_URL}} -> $QGC_IP:{{QGC_VIDEO_PORT}}"
+    echo "Streaming {{CAMERA_URL}} -> {{QGC_HOST}}:{{QGC_VIDEO_PORT}}"
     sudo systemctl status video-stream --no-pager
 
 # Stop video stream
@@ -273,6 +263,7 @@ stream-disable:
 # Show video stream logs
 stream-log:
     sudo journalctl -u video-stream -f
+
 
 # ============================================================================
 # Internal Helpers
