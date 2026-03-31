@@ -12,7 +12,6 @@ QGC_PORT := "14550"
 QGC_HOST := "211.60.101.110"
 QGC_VIDEO_PORT := "5600"
 CAMERA_URL := "rtsp://192.168.144.25:8554/main.264"
-LTE_IFACE := "wwan0"
 
 # ============================================================================
 # Quick Start
@@ -120,25 +119,83 @@ rust-clean:
     @test -d rust/target && cd rust && cargo clean || true
 
 # ============================================================================
-# LTE Route Pinning
+# Network Priority (eth1 > wlan0 > wwan0)
 # ============================================================================
 
-# Install helper script to pin host traffic to LTE interface
-_lte-route-install:
+# Install net-priority script
+_net-install:
     #!/usr/bin/env bash
-    sudo tee /usr/local/bin/ensure-lte-route > /dev/null <<'SCRIPT'
+    sudo tee /usr/local/bin/net-priority > /dev/null <<'SCRIPT'
     #!/bin/sh
-    HOST="$1"
-    IFACE="$2"
-    GW=$(ip route show default dev "$IFACE" 2>/dev/null | head -1 | cut -d' ' -f3)
-    if [ -n "$GW" ]; then
-        ip route replace "$HOST/32" via "$GW" dev "$IFACE"
-    else
-        echo "Warning: no default gateway found on $IFACE" >&2
-        exit 1
-    fi
+    set_metric() {
+        GW=$(ip route show default dev "$1" 2>/dev/null | head -1 | awk '{print $3}')
+        [ -z "$GW" ] && return
+        ip route replace default via "$GW" dev "$1" metric "$2"
+        echo "$1: metric $2 via $GW"
+    }
+
+    apply() {
+        set_metric eth1  100
+        set_metric wlan0 200
+        set_metric wwan0 300
+    }
+
+    apply
+    ip monitor route | while read -r line; do
+        case "$line" in *default*) apply ;; esac
+    done
     SCRIPT
-    sudo chmod +x /usr/local/bin/ensure-lte-route
+    sudo chmod +x /usr/local/bin/net-priority
+
+# Start network priority service
+net-start: _net-install
+    #!/usr/bin/env bash
+    sudo tee /etc/systemd/system/net-priority.service > /dev/null <<'EOF'
+    [Unit]
+    Description=Network interface priority (eth1 > wlan0 > wwan0)
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    ExecStart=/usr/local/bin/net-priority
+    Restart=always
+    RestartSec=5
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable net-priority
+    sudo systemctl restart net-priority
+    sudo systemctl status net-priority --no-pager
+
+# Stop network priority service
+net-stop:
+    sudo systemctl stop net-priority
+
+# Show network priority status
+net-status:
+    sudo systemctl status net-priority --no-pager
+
+# Disable network priority on boot
+net-disable:
+    sudo systemctl disable net-priority
+    sudo systemctl stop net-priority
+    echo "net-priority disabled and stopped"
+
+# Disable WiFi (forces LTE fallback)
+wifi-off:
+    sudo rfkill block wifi
+    echo "WiFi OFF — traffic falls back to LTE"
+
+# Enable WiFi
+wifi-on:
+    sudo rfkill unblock wifi
+    echo "WiFi ON — traffic prefers wlan0"
+
+# Show network priority logs
+net-log:
+    sudo journalctl -u net-priority -f
 
 # ============================================================================
 # MAVLink Router (forward TELEM2 to remote QGroundControl)
@@ -163,7 +220,7 @@ router-install:
     echo "mavlink-router installed successfully"
 
 # Start forwarding TELEM2 to remote QGC
-router-start: _lte-route-install
+router-start: net-start
     #!/usr/bin/env bash
     sudo mkdir -p /etc/mavlink-router
     sudo tee /etc/mavlink-router/main.conf > /dev/null <<CONF
@@ -180,15 +237,14 @@ router-start: _lte-route-install
     Address = {{QGC_HOST}}
     Port = {{QGC_PORT}}
     CONF
-    # Create systemd drop-in: wait for network, pin to LTE, slow restart
+    # Create systemd drop-in: depend on net-priority, slow restart
     sudo mkdir -p /etc/systemd/system/mavlink-router.service.d
-    sudo tee /etc/systemd/system/mavlink-router.service.d/override.conf > /dev/null <<DROPIN
+    sudo tee /etc/systemd/system/mavlink-router.service.d/override.conf > /dev/null <<'DROPIN'
     [Unit]
-    After=network-online.target
-    Wants=network-online.target
+    After=net-priority.service
+    Wants=net-priority.service
 
     [Service]
-    ExecStartPre=+/usr/local/bin/ensure-lte-route {{QGC_HOST}} {{LTE_IFACE}}
     RestartSec=5
     DROPIN
     sudo systemctl daemon-reload
@@ -223,17 +279,16 @@ router-log:
 # ============================================================================
 
 # Start forwarding camera stream to remote QGC
-stream-start: _lte-route-install
+stream-start: net-start
     #!/usr/bin/env bash
     sudo tee /etc/systemd/system/video-stream.service > /dev/null <<EOF
     [Unit]
     Description=Video stream relay to QGC
-    After=network-online.target
-    Wants=network-online.target
+    After=net-priority.service
+    Wants=net-priority.service
 
     [Service]
-    ExecStartPre=+/usr/local/bin/ensure-lte-route {{QGC_HOST}} {{LTE_IFACE}}
-    ExecStart=/usr/bin/ffmpeg -rtsp_transport tcp -timeout 5000000 -fflags +genpts+discardcorrupt -i {{CAMERA_URL}} -c:v copy -bsf:v dump_extra -an -f mpegts -mpegts_flags +resend_headers udp://{{QGC_HOST}}:{{QGC_VIDEO_PORT}}?pkt_size=1316
+    ExecStart=/usr/bin/ffmpeg -use_wallclock_as_timestamps 1 -rtsp_transport tcp -timeout 5000000 -fflags +discardcorrupt -i {{CAMERA_URL}} -c:v copy -bsf:v dump_extra -an -f mpegts -mpegts_flags +resend_headers -flush_packets 1 udp://{{QGC_HOST}}:{{QGC_VIDEO_PORT}}?pkt_size=1316
     Restart=always
     RestartSec=3
 
